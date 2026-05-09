@@ -30,6 +30,14 @@ async def health(db: AsyncIOMotorDatabase = Depends(get_database)) -> dict[str, 
     return {"status": "ok", "database": "connected"}
 
 
+@app.get("/debug/events-count")
+async def events_count(db: AsyncIOMotorDatabase = Depends(get_database)) -> dict[str, int]:
+    total = await db.events.count_documents({})
+    custom = await db.events.count_documents({"source": "custom"})
+    serpapi = await db.events.count_documents({"source": "serpapi"})
+    return {"total": total, "custom": custom, "serpapi": serpapi}
+
+
 @app.get("/api/events", response_model=list[EventOut])
 async def list_events(
     limit: int = Query(default=50, ge=1, le=100),

@@ -15,6 +15,7 @@ class EventIn(BaseModel):
     link: str | None = None
     thumbnail: str | None = None
     description: str | None = None
+    tags: list[str] = Field(default_factory=list)
     source: str = "custom"
 
 
@@ -33,5 +34,6 @@ def serialize_event(event: dict[str, Any]) -> EventOut:
         link=event.get("link"),
         thumbnail=event.get("thumbnail"),
         description=event.get("description"),
+        tags=event.get("tags", []),
         source=event.get("source", "custom"),
     )

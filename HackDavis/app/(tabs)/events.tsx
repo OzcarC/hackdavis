@@ -32,8 +32,23 @@ type Event = {
   link?: string | null;
   thumbnail?: string | null;
   description?: string | null;
+  tags?: string[];
   source?: string;
 };
+
+const eventTagOptions = [
+  'Career',
+  'Community',
+  'Food',
+  'Hackathon',
+  'Music',
+  'Networking',
+  'Social',
+  'Sports',
+  'Study',
+  'Volunteer',
+  'Workshop',
+];
 
 const filters = [
   { label: 'Today', value: 'date:today' },
@@ -48,6 +63,7 @@ export default function EventsScreen() {
   const [locationLoading, setLocationLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState('date:week');
+  const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [eventLocation, setEventLocation] = useState(FALLBACK_LOCATION);
   const [createOpen, setCreateOpen] = useState(false);
   const [savingEvent, setSavingEvent] = useState(false);
@@ -56,6 +72,7 @@ export default function EventsScreen() {
   const [newAddress, setNewAddress] = useState('');
   const [newDescription, setNewDescription] = useState('');
   const [newThumbnail, setNewThumbnail] = useState<string | null>(null);
+  const [newTags, setNewTags] = useState<string[]>([]);
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
 
   useEffect(() => {
@@ -136,6 +153,15 @@ export default function EventsScreen() {
     setNewAddress('');
     setNewDescription('');
     setNewThumbnail(null);
+    setNewTags([]);
+  };
+
+  const toggleNewTag = (tag: string) => {
+    setNewTags((currentTags) =>
+      currentTags.includes(tag)
+        ? currentTags.filter((currentTag) => currentTag !== tag)
+        : [...currentTags, tag]
+    );
   };
 
   const pickThumbnail = async () => {
@@ -187,6 +213,7 @@ export default function EventsScreen() {
           address: [newAddress.trim()],
           description: newDescription.trim() || null,
           thumbnail: newThumbnail,
+          tags: newTags,
         }),
       });
 
@@ -217,6 +244,10 @@ export default function EventsScreen() {
       await Linking.openURL(link);
     }
   };
+
+  const visibleEvents = selectedTag
+    ? events.filter((event) => event.tags?.includes(selectedTag))
+    : events;
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -296,6 +327,27 @@ export default function EventsScreen() {
               {newThumbnail && <Image source={{ uri: newThumbnail }} style={styles.photoPreview} />}
             </View>
 
+            <View style={styles.fieldGroup}>
+              <Text style={styles.label}>Tags</Text>
+              <View style={styles.tagPicker}>
+                {eventTagOptions.map((tag) => {
+                  const selected = newTags.includes(tag);
+
+                  return (
+                    <TouchableOpacity
+                      activeOpacity={0.8}
+                      key={tag}
+                      onPress={() => toggleNewTag(tag)}
+                      style={[styles.tagOption, selected && styles.tagOptionSelected]}>
+                      <Text style={[styles.tagOptionText, selected && styles.tagOptionTextSelected]}>
+                        {tag}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
             <View style={styles.formActions}>
               <TouchableOpacity
                 disabled={savingEvent}
@@ -342,6 +394,15 @@ export default function EventsScreen() {
                 {!!selectedEvent.address?.length && (
                   <Text style={styles.detailAddress}>{selectedEvent.address.join(', ')}</Text>
                 )}
+                {!!selectedEvent.tags?.length && (
+                  <View style={styles.detailTags}>
+                    {selectedEvent.tags.map((tag) => (
+                      <View key={tag} style={styles.tagPill}>
+                        <Text style={styles.tagPillText}>{tag}</Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
                 <Text style={styles.detailDescription}>
                   {selectedEvent.description || 'No description has been added for this event.'}
                 </Text>
@@ -381,6 +442,33 @@ export default function EventsScreen() {
         ))}
       </View>
 
+      <ScrollView
+        contentContainerStyle={styles.tagFilterContent}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.tagFilterRow}>
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={() => setSelectedTag(null)}
+          style={[styles.filterTag, selectedTag === null && styles.filterTagActive]}>
+          <Text style={[styles.filterTagText, selectedTag === null && styles.filterTagTextActive]}>
+            All
+          </Text>
+        </TouchableOpacity>
+
+        {eventTagOptions.map((tag) => (
+          <TouchableOpacity
+            activeOpacity={0.8}
+            key={tag}
+            onPress={() => setSelectedTag(tag)}
+            style={[styles.filterTag, selectedTag === tag && styles.filterTagActive]}>
+            <Text style={[styles.filterTagText, selectedTag === tag && styles.filterTagTextActive]}>
+              {tag}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+
       {loading ? (
         <ActivityIndicator color="#6366F1" style={styles.loader} />
       ) : error ? (
@@ -391,12 +479,12 @@ export default function EventsScreen() {
       ) : (
         <FlatList
           contentContainerStyle={styles.list}
-          data={events}
+          data={visibleEvents}
           keyExtractor={(item, index) => item.id ?? item.link ?? String(index)}
           ListEmptyComponent={
             <View style={styles.messageBox}>
               <Text style={styles.messageTitle}>No events found</Text>
-              <Text style={styles.messageText}>Try another date filter.</Text>
+              <Text style={styles.messageText}>Try another date or tag filter.</Text>
             </View>
           }
           renderItem={({ item }) => (
@@ -426,6 +514,15 @@ export default function EventsScreen() {
                   <Text numberOfLines={2} style={styles.desc}>
                     {item.description}
                   </Text>
+                )}
+                {!!item.tags?.length && (
+                  <View style={styles.cardTags}>
+                    {item.tags.slice(0, 3).map((tag) => (
+                      <View key={tag} style={styles.smallTagPill}>
+                        <Text style={styles.smallTagPillText}>{tag}</Text>
+                      </View>
+                    ))}
+                  </View>
                 )}
               </View>
             </TouchableOpacity>
@@ -537,6 +634,31 @@ const styles = StyleSheet.create({
     height: 150,
     width: '100%',
   },
+  tagPicker: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  tagOption: {
+    backgroundColor: '#fff',
+    borderColor: '#E5E7EB',
+    borderRadius: 16,
+    borderWidth: 1.5,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  tagOptionSelected: {
+    backgroundColor: '#6366F1',
+    borderColor: '#6366F1',
+  },
+  tagOptionText: {
+    color: '#374151',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  tagOptionTextSelected: {
+    color: '#fff',
+  },
   formActions: {
     flexDirection: 'row',
     gap: 10,
@@ -618,6 +740,23 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     marginTop: 6,
   },
+  detailTags: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 4,
+  },
+  tagPill: {
+    backgroundColor: '#EEF2FF',
+    borderRadius: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  tagPillText: {
+    color: '#6366F1',
+    fontSize: 12,
+    fontWeight: '700',
+  },
   detailLinkButton: {
     alignItems: 'center',
     backgroundColor: '#6366F1',
@@ -648,7 +787,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 10,
   },
   chip: {
     backgroundColor: '#fff',
@@ -668,6 +809,36 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   chipTextActive: {
+    color: '#fff',
+  },
+  tagFilterRow: {
+    flexGrow: 0,
+    height: 48,
+  },
+  tagFilterContent: {
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingBottom: 6,
+  },
+  filterTag: {
+    backgroundColor: '#fff',
+    borderColor: '#E5E7EB',
+    borderRadius: 16,
+    borderWidth: 1.5,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  filterTagActive: {
+    backgroundColor: '#111827',
+    borderColor: '#111827',
+  },
+  filterTagText: {
+    color: '#374151',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  filterTagTextActive: {
     color: '#fff',
   },
   loader: {
@@ -730,6 +901,23 @@ const styles = StyleSheet.create({
     color: '#9CA3AF',
     fontSize: 12,
     marginTop: 2,
+  },
+  cardTags: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 5,
+    marginTop: 4,
+  },
+  smallTagPill: {
+    backgroundColor: '#EEF2FF',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  smallTagPillText: {
+    color: '#6366F1',
+    fontSize: 10,
+    fontWeight: '700',
   },
   messageBox: {
     margin: 16,
