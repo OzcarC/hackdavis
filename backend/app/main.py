@@ -10,7 +10,7 @@ from pymongo.errors import DuplicateKeyError, OperationFailure
 
 from app.config import Settings, get_settings
 from app.database import database_lifespan, get_database
-from app.models import EventIn, EventOut, serialize_event
+from app.models import EventIn, EventOut, UserProfileIn, UserProfileOut, serialize_event, serialize_user_profile
 
 app = FastAPI(title="HackDavis API", lifespan=database_lifespan)
 
@@ -36,6 +36,37 @@ async def events_count(db: AsyncIOMotorDatabase = Depends(get_database)) -> dict
     custom = await db.events.count_documents({"source": "custom"})
     serpapi = await db.events.count_documents({"source": "serpapi"})
     return {"total": total, "custom": custom, "serpapi": serpapi}
+
+
+@app.get("/api/users/{uid}", response_model=UserProfileOut)
+async def get_user_profile(
+    uid: str,
+    db: AsyncIOMotorDatabase = Depends(get_database),
+) -> UserProfileOut:
+    profile = await db.user_profiles.find_one({"uid": uid})
+    if profile is None:
+        raise HTTPException(status_code=404, detail="User profile not found.")
+
+    return serialize_user_profile(profile)
+
+
+@app.put("/api/users/{uid}", response_model=UserProfileOut)
+async def upsert_user_profile(
+    uid: str,
+    profile: UserProfileIn,
+    db: AsyncIOMotorDatabase = Depends(get_database),
+) -> UserProfileOut:
+    if uid != profile.uid:
+        raise HTTPException(status_code=400, detail="Profile uid does not match route uid.")
+
+    saved = await db.user_profiles.find_one_and_update(
+        {"uid": uid},
+        {"$set": profile.model_dump()},
+        upsert=True,
+        return_document=ReturnDocument.AFTER,
+    )
+
+    return serialize_user_profile(saved)
 
 
 @app.get("/api/events", response_model=list[EventOut])

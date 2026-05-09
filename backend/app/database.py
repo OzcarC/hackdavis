@@ -43,6 +43,7 @@ async def database_lifespan(app: Any) -> AsyncIterator[None]:
         name="location_2dsphere",
         partialFilterExpression={"source": "custom", "location": {"$exists": True}},
     )
+    await database.user_profiles.create_index("uid", unique=True)
 
     try:
         yield

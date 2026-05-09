@@ -31,6 +31,17 @@ class EventOut(EventIn):
     model_config = ConfigDict(populate_by_name=True)
 
 
+class UserProfileIn(BaseModel):
+    uid: str
+    email: str | None = None
+    display_name: str | None = None
+    photo: str | None = None
+
+
+class UserProfileOut(UserProfileIn):
+    id: str
+
+
 def serialize_event(event: dict[str, Any]) -> EventOut:
     return EventOut(
         id=str(event["_id"]),
@@ -43,4 +54,14 @@ def serialize_event(event: dict[str, Any]) -> EventOut:
         tags=event.get("tags", []),
         location=event.get("location"),
         source=event.get("source", "custom"),
+    )
+
+
+def serialize_user_profile(profile: dict[str, Any]) -> UserProfileOut:
+    return UserProfileOut(
+        id=str(profile["_id"]),
+        uid=profile["uid"],
+        email=profile.get("email"),
+        display_name=profile.get("display_name"),
+        photo=profile.get("photo"),
     )
