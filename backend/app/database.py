@@ -4,6 +4,7 @@ from typing import Any
 
 import certifi
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
+from pymongo.errors import OperationFailure
 
 from app.config import get_settings
 
@@ -21,7 +22,17 @@ async def database_lifespan(app: Any) -> AsyncIterator[None]:
     database = client[settings.mongodb_db_name]
 
     await database.command("ping")
-    await database.events.create_index("link", unique=True, sparse=True)
+
+    try:
+        await database.events.drop_index("link_1")
+    except OperationFailure:
+        pass
+
+    await database.events.create_index(
+        "link",
+        unique=True,
+        partialFilterExpression={"link": {"$type": "string"}},
+    )
 
     try:
         yield

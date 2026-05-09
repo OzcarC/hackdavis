@@ -48,13 +48,15 @@ async def list_events(
                 detail="query and location are required when importing events.",
             )
 
-        return await fetch_and_store_serpapi_events(
+        imported_events = await fetch_and_store_serpapi_events(
             db=db,
             app_settings=app_settings,
             query=query,
             location=location,
             date=date,
         )
+        custom_events = await fetch_custom_events(db=db, limit=limit)
+        return custom_events + imported_events
 
     cursor = db.events.find().sort("_id", -1).limit(limit)
     events = await cursor.to_list(length=limit)
@@ -66,8 +68,11 @@ async def create_event(
     event: EventIn,
     db: AsyncIOMotorDatabase = Depends(get_database),
 ) -> EventOut:
+    event_data = event.model_dump()
+    event_data["source"] = "custom"
+
     try:
-        result = await db.events.insert_one(event.model_dump())
+        result = await db.events.insert_one(event_data)
     except DuplicateKeyError:
         raise HTTPException(status_code=409, detail="Event link already exists.") from None
 
@@ -127,6 +132,10 @@ async def fetch_and_store_serpapi_events(
         except ValidationError:
             continue
 
+        if not event["link"]:
+            continue
+
+        event["source"] = "serpapi"
         saved = await db.events.find_one_and_update(
             {"link": event["link"]},
             {"$set": event},
@@ -136,3 +145,9 @@ async def fetch_and_store_serpapi_events(
         imported.append(serialize_event(saved))
 
     return imported
+
+
+async def fetch_custom_events(db: AsyncIOMotorDatabase, limit: int) -> list[EventOut]:
+    cursor = db.events.find({"source": "custom"}).sort("_id", -1).limit(limit)
+    events = await cursor.to_list(length=limit)
+    return [serialize_event(event) for event in events]

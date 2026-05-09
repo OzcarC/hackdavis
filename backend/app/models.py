@@ -12,9 +12,10 @@ class EventIn(BaseModel):
     title: str
     date: EventDate | None = None
     address: list[str] = Field(default_factory=list)
-    link: str
+    link: str | None = None
     thumbnail: str | None = None
     description: str | None = None
+    source: str = "custom"
 
 
 class EventOut(EventIn):
@@ -29,7 +30,8 @@ def serialize_event(event: dict[str, Any]) -> EventOut:
         title=event["title"],
         date=event.get("date"),
         address=event.get("address", []),
-        link=event["link"],
+        link=event.get("link"),
         thumbnail=event.get("thumbnail"),
         description=event.get("description"),
+        source=event.get("source", "custom"),
     )
