@@ -8,6 +8,11 @@ class EventDate(BaseModel):
     when: str | None = None
 
 
+class EventLocation(BaseModel):
+    type: str = "Point"
+    coordinates: list[float]
+
+
 class EventIn(BaseModel):
     title: str
     date: EventDate | None = None
@@ -16,6 +21,7 @@ class EventIn(BaseModel):
     thumbnail: str | None = None
     description: str | None = None
     tags: list[str] = Field(default_factory=list)
+    location: EventLocation | None = None
     source: str = "custom"
 
 
@@ -35,5 +41,6 @@ def serialize_event(event: dict[str, Any]) -> EventOut:
         thumbnail=event.get("thumbnail"),
         description=event.get("description"),
         tags=event.get("tags", []),
+        location=event.get("location"),
         source=event.get("source", "custom"),
     )

@@ -28,10 +28,20 @@ async def database_lifespan(app: Any) -> AsyncIterator[None]:
     except OperationFailure:
         pass
 
+    try:
+        await database.events.drop_index("location_2dsphere")
+    except OperationFailure:
+        pass
+
     await database.events.create_index(
         "link",
         unique=True,
         partialFilterExpression={"link": {"$type": "string"}},
+    )
+    await database.events.create_index(
+        [("location", "2dsphere")],
+        name="location_2dsphere",
+        partialFilterExpression={"source": "custom", "location": {"$exists": True}},
     )
 
     try:

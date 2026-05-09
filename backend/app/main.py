@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from pydantic import ValidationError
 from pymongo import ReturnDocument
-from pymongo.errors import DuplicateKeyError
+from pymongo.errors import DuplicateKeyError, OperationFailure
 
 from app.config import Settings, get_settings
 from app.database import database_lifespan, get_database
@@ -43,6 +43,9 @@ async def list_events(
     limit: int = Query(default=50, ge=1, le=100),
     query: str | None = None,
     location: str | None = None,
+    lat: float | None = None,
+    lng: float | None = None,
+    radius: int = Query(default=25000, ge=1000, le=100000),
     date: str = "date:week",
     refresh: bool = False,
     db: AsyncIOMotorDatabase = Depends(get_database),
@@ -63,12 +66,16 @@ async def list_events(
             location=location,
             date=date,
         )
-        custom_events = await fetch_custom_events(db=db, limit=limit)
+        custom_events = await fetch_custom_events(
+            db=db,
+            limit=limit,
+            lat=lat,
+            lng=lng,
+            radius=radius,
+        )
         return custom_events + imported_events
 
-    cursor = db.events.find().sort("_id", -1).limit(limit)
-    events = await cursor.to_list(length=limit)
-    return [serialize_event(event) for event in events]
+    return await fetch_custom_events(db=db, limit=limit, lat=lat, lng=lng, radius=radius)
 
 
 @app.post("/api/events", response_model=EventOut, status_code=201)
@@ -155,7 +162,40 @@ async def fetch_and_store_serpapi_events(
     return imported
 
 
-async def fetch_custom_events(db: AsyncIOMotorDatabase, limit: int) -> list[EventOut]:
-    cursor = db.events.find({"source": "custom"}).sort("_id", -1).limit(limit)
-    events = await cursor.to_list(length=limit)
+async def fetch_custom_events(
+    db: AsyncIOMotorDatabase,
+    limit: int,
+    lat: float | None = None,
+    lng: float | None = None,
+    radius: int = 25000,
+) -> list[EventOut]:
+    query: dict[str, Any] = {"source": "custom"}
+    sort = [("_id", -1)]
+
+    if lat is not None and lng is not None:
+        query["location"] = {
+            "$near": {
+                "$geometry": {
+                    "type": "Point",
+                    "coordinates": [lng, lat],
+                },
+                "$maxDistance": radius,
+            }
+        }
+        sort = []
+
+    cursor = db.events.find(query)
+    if sort:
+        cursor = cursor.sort(sort)
+
+    cursor = cursor.limit(limit)
+    try:
+        events = await cursor.to_list(length=limit)
+    except OperationFailure as error:
+        if "unable to find index for $geoNear query" not in str(error):
+            raise
+
+        fallback_cursor = db.events.find({"source": "custom"}).sort("_id", -1).limit(limit)
+        events = await fallback_cursor.to_list(length=limit)
+
     return [serialize_event(event) for event in events]

@@ -20,6 +20,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { API_BASE } from '@/constants/api';
 
 const FALLBACK_LOCATION = 'Davis, CA';
+const FALLBACK_COORDS = {
+  latitude: 38.5449,
+  longitude: -121.7405,
+};
 
 type Event = {
   id?: string;
@@ -34,6 +38,10 @@ type Event = {
   description?: string | null;
   tags?: string[];
   source?: string;
+  location?: {
+    type: 'Point';
+    coordinates: number[];
+  } | null;
 };
 
 const eventTagOptions = [
@@ -65,6 +73,7 @@ export default function EventsScreen() {
   const [filter, setFilter] = useState('date:week');
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [eventLocation, setEventLocation] = useState(FALLBACK_LOCATION);
+  const [eventCoordinates, setEventCoordinates] = useState(FALLBACK_COORDS);
   const [createOpen, setCreateOpen] = useState(false);
   const [savingEvent, setSavingEvent] = useState(false);
   const [newTitle, setNewTitle] = useState('');
@@ -84,12 +93,18 @@ export default function EventsScreen() {
 
         if (status !== Location.PermissionStatus.GRANTED) {
           setEventLocation(FALLBACK_LOCATION);
+          setEventCoordinates(FALLBACK_COORDS);
           return;
         }
 
         const currentPosition = await Location.getCurrentPositionAsync({
           accuracy: Location.Accuracy.Balanced,
         });
+        setEventCoordinates({
+          latitude: currentPosition.coords.latitude,
+          longitude: currentPosition.coords.longitude,
+        });
+
         const [place] = await Location.reverseGeocodeAsync(currentPosition.coords);
         const city = place?.city ?? place?.subregion ?? place?.district;
         const region = place?.region;
@@ -102,6 +117,7 @@ export default function EventsScreen() {
       } catch (locationError) {
         console.error(locationError);
         setEventLocation(FALLBACK_LOCATION);
+        setEventCoordinates(FALLBACK_COORDS);
       } finally {
         setLocationLoading(false);
       }
@@ -123,6 +139,9 @@ export default function EventsScreen() {
         const params = new URLSearchParams({
           query: 'events near me',
           location: eventLocation,
+          lat: String(eventCoordinates.latitude),
+          lng: String(eventCoordinates.longitude),
+          radius: '25000',
           date: filter,
         });
         const eventsUrl = `${API_BASE}/api/events?${params.toString()}`;
@@ -145,7 +164,7 @@ export default function EventsScreen() {
     };
 
     fetchEvents();
-  }, [eventLocation, filter, locationLoading]);
+  }, [eventCoordinates.latitude, eventCoordinates.longitude, eventLocation, filter, locationLoading]);
 
   const resetCreateForm = () => {
     setNewTitle('');
@@ -199,6 +218,14 @@ export default function EventsScreen() {
     setSavingEvent(true);
 
     try {
+      const geocodedAddresses = await Location.geocodeAsync(newAddress.trim());
+      const eventCoords = geocodedAddresses[0];
+
+      if (!eventCoords) {
+        Alert.alert('Address not found', 'Please enter a more specific address.');
+        return;
+      }
+
       const response = await fetch(`${API_BASE}/api/events`, {
         method: 'POST',
         headers: {
@@ -214,6 +241,10 @@ export default function EventsScreen() {
           description: newDescription.trim() || null,
           thumbnail: newThumbnail,
           tags: newTags,
+          location: {
+            type: 'Point',
+            coordinates: [eventCoords.longitude, eventCoords.latitude],
+          },
         }),
       });
 
@@ -863,14 +894,16 @@ const styles = StyleSheet.create({
   },
   thumb: {
     backgroundColor: '#E5E7EB',
-    height: 90,
+    alignSelf: 'stretch',
+    minHeight: 112,
     width: 90,
   },
   thumbPlaceholder: {
     alignItems: 'center',
     backgroundColor: '#EEF2FF',
-    height: 90,
+    alignSelf: 'stretch',
     justifyContent: 'center',
+    minHeight: 112,
     width: 90,
   },
   thumbPlaceholderText: {
