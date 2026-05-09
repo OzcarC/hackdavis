@@ -6,7 +6,6 @@ import {
   Animated,
   KeyboardAvoidingView,
   Platform,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
@@ -14,6 +13,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import { auth } from "../../firebase";
 import {
@@ -100,26 +100,31 @@ export default function AuthScreen() {
 
     setLoading(true);
     try {
-      if (mode == "login") {
+      if (mode === "login") {
         await signInWithEmailAndPassword(auth, email, password);
-        router.replace("/home");
       } else {
         await createUserWithEmailAndPassword(auth, email, password);
-        router.replace("/home");
       }
+      router.replace("/home");
     } catch (error: any) {
       Alert.alert("Error", error.message);
     } finally {
       setLoading(false);
     }
+  };
 
-    Alert.alert(
-      mode === "login" ? "Logged in!" : "Account created!",
-      mode === "login"
-        ? `Welcome back, ${email}`
-        : `Welcome, ${name}! Your account is ready.`,
-      [{ text: "Continue", onPress: () => router.replace("/home") }]
-    );
+  const handleForgotPassword = async () => {
+    if (!email.trim()) {
+      Alert.alert("Missing email", "Enter your email address first.");
+      return;
+    }
+
+    try {
+      await sendPasswordResetEmail(auth, email);
+      Alert.alert("Reset email sent", "Check your inbox for password reset instructions.");
+    } catch (error: any) {
+      Alert.alert("Error", error.message);
+    }
   };
 
   return (
@@ -273,7 +278,7 @@ export default function AuthScreen() {
               )}
 
               {mode === "login" && (
-                <TouchableOpacity style={styles.forgotBtn}>
+                <TouchableOpacity onPress={handleForgotPassword} style={styles.forgotBtn}>
                   <Text style={styles.forgotText}>Forgot password?</Text>
                 </TouchableOpacity>
               )}
