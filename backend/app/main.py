@@ -7,10 +7,22 @@ from bson.errors import InvalidId
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from pymongo import ReturnDocument
 from pymongo.errors import DuplicateKeyError, OperationFailure
-
+from app.routers import venues as venues_router
+from app.routers import ai as ai_router
 from app.config import get_settings
 from app.database import database_lifespan, get_database
-from app.models import Attendee, EventIn, EventOut, UserProfileIn, UserProfileOut, serialize_event, serialize_user_profile
+from app.models import (
+    Attendee,
+    EventIn,
+    EventOut,
+    UserProfileIn,
+    UserProfileOut,
+    VenueIn,
+    VenueOut,
+    serialize_event,
+    serialize_user_profile,
+    serialize_venue,
+)
 
 app = FastAPI(title="HackDavis API", lifespan=database_lifespan)
 
@@ -23,6 +35,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(venues_router.router)
+app.include_router(ai_router.router)
 
 @app.get("/health")
 async def health(db: AsyncIOMotorDatabase = Depends(get_database)) -> dict[str, str]:
@@ -88,6 +102,38 @@ async def upsert_user_profile(
 
     return serialize_user_profile(saved)
 
+
+@app.post("/api/users/{uid}/account-type", response_model=UserProfileOut)
+async def set_account_type(
+    uid: str,
+    payload: dict,
+    db: AsyncIOMotorDatabase = Depends(get_database),
+) -> UserProfileOut:
+    new_type = payload.get("account_type")
+    if new_type not in {"user", "business"}:
+        raise HTTPException(
+            status_code=400,
+            detail="account_type must be 'user' or 'business'.",
+        )
+
+    profile = await db.user_profiles.find_one({"uid": uid})
+    if profile is None:
+        raise HTTPException(status_code=404, detail="User profile not found.")
+
+    saved = await db.user_profiles.find_one_and_update(
+        {"uid": uid},
+        {"$set": {"account_type": new_type}},
+        return_document=ReturnDocument.AFTER,
+    )
+
+    # If downgrading, soft-deactivate any venues they own
+    if new_type == "user":
+        await db.venues.update_many(
+            {"owner_uid": uid},
+            {"$set": {"active": False}},
+        )
+
+    return serialize_user_profile(saved)
 
 @app.get("/api/events", response_model=list[EventOut])
 async def list_events(
