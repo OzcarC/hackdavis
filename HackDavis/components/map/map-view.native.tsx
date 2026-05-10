@@ -13,6 +13,10 @@ import { router } from "expo-router";
 import MapView, { Callout, Marker, Region } from "react-native-maps";
 
 import { API_BASE } from "../../constants/api";
+import { colorForTag, flatButton, palette } from "../../constants/palette";
+
+const TAG_BG = "#EEF2FF";
+const TAG_TEXT = "#4F46E5";
 
 const FALLBACK_REGION = {
   latitude: 38.5449,
@@ -74,7 +78,7 @@ const TAG_COLORS: Record<string, string> = {
 
 const markerColor = (event: Event) => {
   const firstTag = event.tags?.[0];
-  return firstTag ? TAG_COLORS[firstTag] ?? "#6366F1" : "#6366F1";
+  return firstTag ? TAG_COLORS[firstTag] ?? palette.navy : palette.navy;
 };
 
 const TAG_EMOJIS: Record<string, string> = {
@@ -208,7 +212,7 @@ export default function MapScreen() {
   if (!initialRegion) {
     return (
       <View style={styles.loading}>
-        <ActivityIndicator color="#6366F1" size="large" />
+        <ActivityIndicator color={palette.coral} size="large" />
         <Text style={styles.loadingText}>Finding your location...</Text>
       </View>
     );
@@ -319,7 +323,7 @@ export default function MapScreen() {
       </MapView>
       {(eventsLoading || eventsError || events.length > 0) && (
         <View pointerEvents="none" style={styles.statusBadge}>
-          {eventsLoading && <ActivityIndicator color="#fff" size="small" />}
+          {eventsLoading && <ActivityIndicator color={palette.card} size="small" />}
           <Text style={styles.statusBadgeText}>
             {eventsLoading
               ? "Loading events"
@@ -410,10 +414,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 12,
-    backgroundColor: "#F9FAFB",
+    backgroundColor: palette.bg,
   },
   loadingText: {
-    color: "#6B7280",
+    color: palette.textMuted,
     fontSize: 14,
   },
   markerContainer: {
@@ -426,7 +430,7 @@ const styles = StyleSheet.create({
   },
   markerBubble: {
     alignItems: "center",
-    backgroundColor: "#fff",
+    backgroundColor: palette.card,
     borderRadius: 20,
     borderWidth: 2,
     elevation: 3,
@@ -463,7 +467,7 @@ const styles = StyleSheet.create({
     padding: 10,
   },
   calloutImage: {
-    backgroundColor: "#E5E7EB",
+    backgroundColor: palette.border,
     borderRadius: 8,
     height: 92,
     marginBottom: 8,
@@ -478,22 +482,22 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   calloutImageFallbackText: {
-    color: "#fff",
+    color: palette.card,
     fontSize: 30,
     fontWeight: "700",
   },
   calloutText: {
-    color: "#4B5563",
+    color: palette.textMuted,
     fontSize: 12,
     marginTop: 4,
   },
   calloutTitle: {
-    color: "#111827",
+    color: palette.textPrimary,
     fontSize: 14,
     fontWeight: "700",
   },
   calloutDescription: {
-    color: "#6B7280",
+    color: palette.textMuted,
     fontSize: 12,
     lineHeight: 16,
     marginTop: 6,
@@ -505,20 +509,20 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   tagPill: {
-    backgroundColor: "#EEF2FF",
+    backgroundColor: TAG_BG,
     borderRadius: 10,
     paddingHorizontal: 8,
     paddingVertical: 3,
   },
   tagPillText: {
-    color: "#4F46E5",
+    color: TAG_TEXT,
     fontSize: 10,
     fontWeight: "700",
   },
   statusBadge: {
     alignItems: "center",
     alignSelf: "center",
-    backgroundColor: "rgba(17, 24, 39, 0.86)",
+    backgroundColor: "rgba(40, 57, 86, 0.86)",
     borderRadius: 14,
     flexDirection: "row",
     gap: 6,
@@ -528,13 +532,13 @@ const styles = StyleSheet.create({
     top: 14,
   },
   statusBadgeText: {
-    color: "#fff",
+    color: palette.card,
     fontSize: 12,
     fontWeight: "600",
   },
   androidPreview: {
-    backgroundColor: "#fff",
-    borderColor: "#E5E7EB",
+    backgroundColor: palette.card,
+    borderColor: palette.border,
     borderRadius: 16,
     borderWidth: 1,
     bottom: 18,
@@ -550,7 +554,7 @@ const styles = StyleSheet.create({
   },
   previewCloseButton: {
     alignItems: "center",
-    backgroundColor: "rgba(17, 24, 39, 0.72)",
+    backgroundColor: "rgba(40, 57, 86, 0.72)",
     borderRadius: 14,
     height: 28,
     justifyContent: "center",
@@ -561,7 +565,7 @@ const styles = StyleSheet.create({
     zIndex: 2,
   },
   previewCloseText: {
-    color: "#fff",
+    color: palette.card,
     fontSize: 20,
     fontWeight: "700",
     lineHeight: 22,
@@ -571,7 +575,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   previewImage: {
-    backgroundColor: "#E5E7EB",
+    backgroundColor: palette.border,
     borderRadius: 10,
     height: 96,
     width: 96,
@@ -584,7 +588,7 @@ const styles = StyleSheet.create({
     width: 96,
   },
   previewImageFallbackText: {
-    color: "#fff",
+    color: palette.card,
     fontSize: 34,
     fontWeight: "700",
   },
@@ -593,18 +597,18 @@ const styles = StyleSheet.create({
     paddingRight: 20,
   },
   previewTitle: {
-    color: "#111827",
+    color: palette.textPrimary,
     fontSize: 16,
     fontWeight: "700",
     lineHeight: 20,
   },
   previewMeta: {
-    color: "#4B5563",
+    color: palette.textMuted,
     fontSize: 12,
     marginTop: 4,
   },
   previewDescription: {
-    color: "#6B7280",
+    color: palette.textMuted,
     fontSize: 12,
     lineHeight: 16,
     marginTop: 6,
@@ -617,14 +621,15 @@ const styles = StyleSheet.create({
   },
   previewDetailsButton: {
     alignItems: "center",
-    backgroundColor: "#6366F1",
+    backgroundColor: palette.coral,
     borderRadius: 12,
     justifyContent: "center",
     marginTop: 12,
     minHeight: 44,
+    ...flatButton('coral'),
   },
   previewDetailsText: {
-    color: "#fff",
+    color: palette.card,
     fontSize: 14,
     fontWeight: "700",
   },

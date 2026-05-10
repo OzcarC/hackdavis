@@ -126,6 +126,27 @@ async def get_event(
     return serialize_event(event)
 
 
+@app.delete("/api/events/{event_id}", status_code=204)
+async def delete_event(
+    event_id: str,
+    uid: str,
+    db: AsyncIOMotorDatabase = Depends(get_database),
+) -> None:
+    try:
+        event_object_id = ObjectId(event_id)
+    except InvalidId:
+        raise HTTPException(status_code=404, detail="Event not found.") from None
+
+    event = await db.events.find_one({"_id": event_object_id})
+    if event is None:
+        raise HTTPException(status_code=404, detail="Event not found.")
+
+    if event.get("author") != uid:
+        raise HTTPException(status_code=403, detail="Only the event author can delete this event.")
+
+    await db.events.delete_one({"_id": event_object_id})
+
+
 async def fetch_custom_events(
     db: AsyncIOMotorDatabase,
     limit: int,

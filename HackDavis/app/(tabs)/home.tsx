@@ -33,6 +33,13 @@ export default function HomeScreen() {
   const hasMoreHappening = displayEvents.length > HAPPENING_LIMIT;
 
   const goToEvents = () => router.push('/(tabs)/events');
+  const openEvent = (event: { id?: string }) => {
+    if (event.id) {
+      router.push({ pathname: '/events/[id]', params: { id: event.id } });
+    } else {
+      goToEvents();
+    }
+  };
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -70,7 +77,7 @@ export default function HomeScreen() {
                         <EventCard
                           key={event.id ?? event.link ?? `for-you-${index}`}
                           event={event}
-                          onPress={goToEvents}
+                          onPress={openEvent}
                         />
                       ))}
 
@@ -101,7 +108,7 @@ export default function HomeScreen() {
                         <EventCard
                           key={event.id ?? event.link ?? `area-${index}`}
                           event={event}
-                          onPress={goToEvents}
+                          onPress={openEvent}
                         />
                       ))}
 
@@ -234,7 +241,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
   },
   areaContainer: {
-    backgroundColor: palette.card,
     borderColor: palette.border,
     borderRadius: 18,
     borderWidth: 1,

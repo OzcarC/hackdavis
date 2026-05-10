@@ -8,13 +8,14 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { API_BASE } from "@/constants/api";
-import { colorForTag, palette } from "@/constants/palette";
+import { colorForTag, flatButton, palette } from "@/constants/palette";
 import { auth } from "../../firebase";
 
 type Attendee = {
@@ -52,6 +53,10 @@ export default function EventDetailsScreen() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [savingRsvp, setSavingRsvp] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [cancelReasonModalOpen, setCancelReasonModalOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
+  const [rsvpCooldown, setRsvpCooldown] = useState(0);
 
   const user = auth.currentUser;
 
@@ -113,6 +118,44 @@ export default function EventDetailsScreen() {
   const isAttending = event?.attendees?.some(
     (attendee) => attendee.uid === user?.uid
   );
+  const isAuthor = !!user && !!event?.author && event.author === user.uid;
+
+  const handleCancelEvent = () => {
+    setCancelReasonModalOpen(true);
+  };
+
+  const submitCancellation = async () => {
+    if (!event?.id || !user || !cancelReason.trim()) {
+      Alert.alert("Required", "Please provide a reason for cancellation.");
+      return;
+    }
+
+    setCancelling(true);
+    try {
+      const response = await fetch(
+        `${API_BASE}/api/events/${event.id}/cancel`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            uid: user.uid,
+            reason: cancelReason.trim(),
+          }),
+        }
+      );
+      if (!response.ok) {
+        throw new Error(`Status ${response.status}`);
+      }
+      setCancelReasonModalOpen(false);
+      Alert.alert("Event cancelled", "You've cancelled this event.", [
+        { text: "OK", onPress: () => router.back() },
+      ]);
+    } catch (error) {
+      console.error(error);
+      Alert.alert("Could not cancel", "Try again in a moment.");
+      setCancelling(false);
+    }
+  };
 
   const toggleRsvp = async () => {
     if (!event?.id || !user) {
@@ -120,25 +163,67 @@ export default function EventDetailsScreen() {
       return;
     }
 
+    if (isAttending) {
+      Alert.prompt(
+        "Why are you cancelling your RSVP?",
+        "Let the organizer know...",
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Cancel RSVP",
+            style: "destructive",
+            onPress: async (reason) => {
+              setSavingRsvp(true);
+              try {
+                const response = await fetch(
+                  `${API_BASE}/api/events/${event.id}/rsvp/${user.uid}`,
+                  { method: "DELETE" }
+                );
+
+                if (!response.ok) {
+                  throw new Error(`Status ${response.status}`);
+                }
+
+                const updated = (await response.json()) as Event;
+                setEvent(updated);
+                setRsvpCooldown(10);
+                const interval = setInterval(() => {
+                  setRsvpCooldown((prev) => {
+                    if (prev <= 1) {
+                      clearInterval(interval);
+                      return 0;
+                    }
+                    return prev - 1;
+                  });
+                }, 1000);
+              } catch (error) {
+                console.error(error);
+                Alert.alert("RSVP failed", "Please try again in a moment.");
+              } finally {
+                setSavingRsvp(false);
+              }
+            },
+          },
+        ]
+      );
+      return;
+    }
+
     setSavingRsvp(true);
     try {
-      const response = isAttending
-        ? await fetch(`${API_BASE}/api/events/${event.id}/rsvp/${user.uid}`, {
-            method: "DELETE",
-          })
-        : await fetch(`${API_BASE}/api/events/${event.id}/rsvp`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              uid: user.uid,
-              display_name:
-                profile?.display_name ||
-                user.displayName ||
-                user.email?.split("@")[0] ||
-                "Anonymous",
-              photo: profile?.photo ?? user.photoURL,
-            }),
-          });
+      const response = await fetch(`${API_BASE}/api/events/${event.id}/rsvp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          uid: user.uid,
+          display_name:
+            profile?.display_name ||
+            user.displayName ||
+            user.email?.split("@")[0] ||
+            "Anonymous",
+          photo: profile?.photo ?? user.photoURL,
+        }),
+      });
 
       if (!response.ok) {
         throw new Error(`Status ${response.status}`);
@@ -166,21 +251,20 @@ export default function EventDetailsScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <Stack.Screen
-        options={{
-          title: event?.title ?? "Event",
-          headerBackTitle: "Back",
-        }}
-      />
-
+    <Stack.Screen options={{ headerShown: false }}>
+      <SafeAreaView style={styles.safe}>
       {loading ? (
         <View style={styles.center}>
           <ActivityIndicator color={palette.coral} size="large" />
         </View>
       ) : event ? (
-        <ScrollView contentContainerStyle={styles.content}>
-          {event.thumbnail ? (
+        <>
+          <ScrollView contentContainerStyle={styles.content}>
+            <View style={styles.titleRow}>
+              <View style={[styles.titleStripe, { backgroundColor: palette.navy }]} />
+              <Text style={styles.pageTitle}>{event.title}</Text>
+            </View>
+            {event.thumbnail ? (
             <Image source={{ uri: event.thumbnail }} style={styles.heroImage} />
           ) : (
             <View style={styles.heroFallback}>
@@ -189,7 +273,6 @@ export default function EventDetailsScreen() {
           )}
 
           <View style={styles.body}>
-            <Text style={styles.title}>{event.title}</Text>
             {!!event.date?.when && (
               <Text style={styles.when}>{event.date.when}</Text>
             )}
@@ -269,22 +352,93 @@ export default function EventDetailsScreen() {
               <Text style={styles.linkButtonText}>Open event link</Text>
             </TouchableOpacity>
           )}
+
+          {isAuthor && (
+            <TouchableOpacity
+              activeOpacity={0.85}
+              disabled={cancelling}
+              onPress={handleCancelEvent}
+              style={[styles.cancelButton, cancelling && styles.cancelButtonDisabled]}
+            >
+              <Text style={styles.cancelButtonText}>
+                {cancelling ? "Cancelling..." : "Cancel event"}
+              </Text>
+            </TouchableOpacity>
+          )}
         </ScrollView>
+
+          {cancelReasonModalOpen && (
+            <View style={styles.modalOverlay}>
+              <View style={styles.modalContent}>
+                <Text style={styles.modalTitle}>Why are you cancelling?</Text>
+                <TextInput
+                  multiline
+                  numberOfLines={4}
+                  placeholder="Let attendees know why..."
+                  placeholderTextColor={palette.textMuted}
+                  style={styles.reasonInput}
+                  value={cancelReason}
+                  onChangeText={setCancelReason}
+                />
+                <View style={styles.modalActions}>
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    onPress={() => {
+                      setCancelReasonModalOpen(false);
+                      setCancelReason("");
+                    }}
+                    style={styles.modalCancel}
+                  >
+                    <Text style={styles.modalCancelText}>Keep it</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    disabled={cancelling || !cancelReason.trim()}
+                    onPress={submitCancellation}
+                    style={[styles.modalSubmit, (!cancelReason.trim() || cancelling) && styles.modalSubmitDisabled]}
+                  >
+                    <Text style={styles.modalSubmitText}>
+                      {cancelling ? "Cancelling..." : "Cancel event"}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          )}
+        </>
       ) : (
         <View style={styles.center}>
           <Text style={styles.emptyTitle}>Event not found</Text>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <Text style={styles.backButtonText}>Go back</Text>
+          <TouchableOpacity onPress={() => router.back()} style={styles.notFoundBackButton}>
+            <Text style={styles.notFoundBackButtonText}>Go back</Text>
           </TouchableOpacity>
         </View>
       )}
     </SafeAreaView>
+    </Stack.Screen>
   );
 }
 
 const styles = StyleSheet.create({
   safe: {
     backgroundColor: palette.bg,
+    flex: 1,
+  },
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 16,
+  },
+  titleStripe: {
+    width: 5,
+    borderRadius: 3,
+    height: 32,
+  },
+  pageTitle: {
+    color: palette.navy,
+    fontSize: 28,
+    fontWeight: "700",
     flex: 1,
   },
   center: {
@@ -313,7 +467,7 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   heroFallbackText: {
-    color: "#fff",
+    color: palette.card,
     fontSize: 18,
     fontWeight: "700",
   },
@@ -348,7 +502,7 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
   },
   tagText: {
-    color: "#fff",
+    color: palette.card,
     fontSize: 12,
     fontWeight: "700",
   },
@@ -368,23 +522,23 @@ const styles = StyleSheet.create({
   },
   rsvpButton: {
     alignItems: "center",
-    backgroundColor: palette.card,
-    borderColor: palette.coral,
+    backgroundColor: palette.coral,
     borderRadius: 12,
-    borderWidth: 1.5,
     justifyContent: "center",
     minHeight: 48,
+    ...flatButton('coral'),
   },
   rsvpButtonActive: {
-    backgroundColor: palette.coral,
+    backgroundColor: palette.navy,
+    ...flatButton('navy'),
   },
   rsvpButtonText: {
-    color: palette.coral,
+    color: palette.card,
     fontSize: 15,
     fontWeight: "700",
   },
   rsvpButtonTextActive: {
-    color: "#fff",
+    color: palette.card,
   },
   attendeeList: {
     gap: 10,
@@ -425,7 +579,92 @@ const styles = StyleSheet.create({
     minHeight: 48,
   },
   linkButtonText: {
-    color: "#fff",
+    color: palette.card,
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  cancelButton: {
+    alignItems: "center",
+    backgroundColor: palette.card,
+    borderColor: palette.coral,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    justifyContent: "center",
+    minHeight: 48,
+    ...flatButton('coral'),
+  },
+  cancelButtonDisabled: {
+    opacity: 0.6,
+  },
+  cancelButtonText: {
+    color: palette.coral,
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  modalOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "flex-end",
+    zIndex: 10,
+  },
+  modalContent: {
+    backgroundColor: palette.card,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    gap: 14,
+    paddingBottom: 40,
+  },
+  modalTitle: {
+    color: palette.textPrimary,
+    fontSize: 18,
+    fontWeight: "700",
+  },
+  reasonInput: {
+    backgroundColor: palette.bg,
+    borderColor: palette.border,
+    borderRadius: 12,
+    borderWidth: 1,
+    color: palette.textPrimary,
+    padding: 12,
+    fontSize: 15,
+    maxHeight: 120,
+    textAlignVertical: "top",
+  },
+  modalActions: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  modalCancel: {
+    flex: 1,
+    alignItems: "center",
+    backgroundColor: palette.bg,
+    borderRadius: 12,
+    justifyContent: "center",
+    minHeight: 44,
+  },
+  modalCancelText: {
+    color: palette.textPrimary,
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  modalSubmit: {
+    flex: 1,
+    alignItems: "center",
+    backgroundColor: palette.coral,
+    borderRadius: 12,
+    justifyContent: "center",
+    minHeight: 44,
+  },
+  modalSubmitDisabled: {
+    opacity: 0.6,
+  },
+  modalSubmitText: {
+    color: palette.card,
     fontSize: 15,
     fontWeight: "700",
   },
@@ -434,12 +673,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "700",
   },
-  backButton: {
+  notFoundBackButton: {
     marginTop: 14,
     paddingHorizontal: 16,
     paddingVertical: 10,
   },
-  backButtonText: {
+  notFoundBackButtonText: {
     color: palette.coral,
     fontSize: 15,
     fontWeight: "700",
