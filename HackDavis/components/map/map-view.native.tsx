@@ -4,14 +4,14 @@ import { useState, useEffect } from "react";
 import * as Location from "expo-location";
 
 export default function MapScreen() {
-  const [region, setRegion] = useState<Region | null>(null);
+  const [initialRegion, setInitialRegion] = useState<Region | null>(null);
 
   useEffect(() => {
     (async () => {
       // request permission
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== "granted") {
-        setRegion({
+        setInitialRegion({
           latitude: 37.7749,
           longitude: -122.4194,
           latitudeDelta: 0.05,
@@ -22,7 +22,7 @@ export default function MapScreen() {
 
       // get current position
       const location = await Location.getCurrentPositionAsync({});
-      setRegion({
+      setInitialRegion({
         latitude: location.coords.latitude,
         longitude: location.coords.longitude,
         latitudeDelta: 0.05,
@@ -32,7 +32,7 @@ export default function MapScreen() {
   }, []);
 
   // show spinner while location loads
-  if (!region) {
+  if (!initialRegion) {
     return (
       <View style={styles.loading}>
         <ActivityIndicator size="large" />
@@ -43,8 +43,7 @@ export default function MapScreen() {
   return (
     <MapView
       style={styles.map}
-      region={region}
-      onRegionChangeComplete={setRegion}
+      initialRegion={initialRegion}
       showsUserLocation={true}
       showsMyLocationButton={true}
       provider="google"

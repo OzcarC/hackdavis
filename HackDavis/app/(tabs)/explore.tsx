@@ -112,7 +112,7 @@
 // });
 
 import { StyleSheet, View } from "react-native";
-import MapScreen from "@/components/map/map-view";
+import MapScreen from "../../components/map/map-view";
 
 export default function MapPage() {
   return (
