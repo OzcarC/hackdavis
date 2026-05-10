@@ -103,17 +103,8 @@ export default function AuthScreen() {
     setLoading(true);
     try {
       if (mode === "login") {
-        const credential = await signInWithEmailAndPassword(auth, email, password);
-        const response = await fetch(`${API_BASE}/api/users/${credential.user.uid}`);
-
-        if (response.ok) {
-          const profile = (await response.json()) as {
-            onboarding_completed?: boolean;
-          };
-          router.replace(profile.onboarding_completed ? "/home" : "/onboarding/step1");
-        } else {
-          router.replace("/home");
-        }
+        await signInWithEmailAndPassword(auth, email, password);
+        router.replace("/home");
       } else {
         const credential = await createUserWithEmailAndPassword(auth, email, password);
         await fetch(`${API_BASE}/api/users/${credential.user.uid}`, {
