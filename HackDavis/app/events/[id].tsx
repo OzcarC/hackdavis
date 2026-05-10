@@ -171,7 +171,7 @@ export default function EventDetailsScreen() {
           {
             text: "Cancel RSVP",
             style: "destructive",
-            onPress: async (_reason?: string) => {
+            onPress: async (reason?: string) => {
               setSavingRsvp(true);
               try {
                 const response = await fetch(
@@ -240,9 +240,7 @@ export default function EventDetailsScreen() {
   };
 
   return (
-    <>
-      <Stack.Screen options={{ headerShown: false }} />
-      <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={styles.safe}>
       {loading ? (
         <View style={styles.center}>
           <ActivityIndicator color={palette.coral} size="large" />
@@ -405,9 +403,12 @@ export default function EventDetailsScreen() {
         </View>
       )}
     </SafeAreaView>
-    </>
   );
 }
+
+EventDetailsScreen.screenOptions = {
+  headerShown: false,
+};
 
 const styles = StyleSheet.create({
   safe: {
