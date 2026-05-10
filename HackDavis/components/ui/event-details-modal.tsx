@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -9,13 +9,18 @@ import {
   Text,
   TouchableOpacity,
   View,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
-import { API_BASE } from '@/constants/api';
-import { colorForTag, flatButton, flatOutline, palette } from '@/constants/palette';
-import type { Event } from '@/types/event';
-import { auth } from '../../firebase';
+import { API_BASE } from "@/constants/api";
+import {
+  colorForTag,
+  flatButton,
+  flatOutline,
+  palette,
+} from "@/constants/palette";
+import type { Event } from "@/types/event";
+import { auth } from "../../firebase";
 
 type UserProfile = {
   uid: string;
@@ -31,19 +36,21 @@ type Props = {
   onEventUpdate?: (event: Event) => void;
 };
 
-export function EventDetailsModal({ event, visible, onClose, onEventUpdate }: Props) {
+export function EventDetailsModal({
+  event,
+  visible,
+  onClose,
+  onEventUpdate,
+}: Props) {
   const [currentEvent, setCurrentEvent] = useState<Event | null>(event);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [rsvpSaving, setRsvpSaving] = useState(false);
 
   const user = auth.currentUser;
   const currentUid = user?.uid;
-  const isAttending = !!currentEvent?.attendees?.some((a) => a.uid === currentUid);
-
-  useEffect(() => {
-    setCurrentEvent(event);
-    setRsvpSaving(false);
-  }, [event]);
+  const isAttending = !!currentEvent?.attendees?.some(
+    (a) => a.uid === currentUid
+  );
 
   useEffect(() => {
     if (!user || !visible) return;
@@ -61,6 +68,46 @@ export function EventDetailsModal({ event, visible, onClose, onEventUpdate }: Pr
     };
   }, [user, visible]);
 
+  useEffect(() => {
+    if (!visible || !event?.id) return;
+
+    let cancelled = false;
+
+    const fetchEvent = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/events/${event.id}`);
+        if (!cancelled && res.ok) {
+          const freshEvent = await res.json();
+          setCurrentEvent(freshEvent);
+          onEventUpdate?.(freshEvent);
+        }
+      } catch (e) {
+        console.error("Failed to refresh event", e);
+      }
+    };
+
+    fetchEvent();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [visible, event?.id]);
+
+  useEffect(() => {
+    if (!visible || !event?.id) return;
+
+    const interval = setInterval(async () => {
+      const res = await fetch(`${API_BASE}/api/events/${event.id}`);
+      if (res.ok) {
+        const updated = await res.json();
+        setCurrentEvent(updated);
+        onEventUpdate?.(updated);
+      }
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [visible, event?.id]);
+
   const handleRsvp = async () => {
     if (!currentUid || !currentEvent?.id) return;
 
@@ -68,14 +115,14 @@ export function EventDetailsModal({ event, visible, onClose, onEventUpdate }: Pr
     const displayName =
       profile?.display_name ||
       user?.displayName ||
-      user?.email?.split('@')[0] ||
-      'Anonymous';
+      user?.email?.split("@")[0] ||
+      "Anonymous";
 
     try {
       if (isAttending) {
         const res = await fetch(
           `${API_BASE}/api/events/${currentEvent.id}/rsvp/${currentUid}`,
-          { method: 'DELETE' }
+          { method: "DELETE" }
         );
         if (res.ok) {
           const updated = (await res.json()) as Event;
@@ -83,15 +130,18 @@ export function EventDetailsModal({ event, visible, onClose, onEventUpdate }: Pr
           onEventUpdate?.(updated);
         }
       } else {
-        const res = await fetch(`${API_BASE}/api/events/${currentEvent.id}/rsvp`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            uid: currentUid,
-            display_name: displayName,
-            photo: profile?.photo ?? user?.photoURL,
-          }),
-        });
+        const res = await fetch(
+          `${API_BASE}/api/events/${currentEvent.id}/rsvp`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              uid: currentUid,
+              display_name: displayName,
+              photo: profile?.photo ?? user?.photoURL,
+            }),
+          }
+        );
         if (res.ok) {
           const updated = (await res.json()) as Event;
           setCurrentEvent(updated);
@@ -111,11 +161,7 @@ export function EventDetailsModal({ event, visible, onClose, onEventUpdate }: Pr
   };
 
   return (
-    <Modal
-      animationType="slide"
-      onRequestClose={onClose}
-      visible={visible}
-    >
+    <Modal animationType="slide" onRequestClose={onClose} visible={visible}>
       <SafeAreaView style={styles.modalSafe}>
         <View style={styles.modalHeader}>
           <Text style={styles.modalTitle}>Event Details</Text>
@@ -141,7 +187,7 @@ export function EventDetailsModal({ event, visible, onClose, onEventUpdate }: Pr
               <Text style={styles.detailTitle}>{currentEvent.title}</Text>
               {!!currentEvent.address?.length && (
                 <Text style={styles.detailAddress}>
-                  {currentEvent.address.join(', ')}
+                  {currentEvent.address.join(", ")}
                 </Text>
               )}
               {!!currentEvent.tags?.length && (
@@ -149,7 +195,10 @@ export function EventDetailsModal({ event, visible, onClose, onEventUpdate }: Pr
                   {currentEvent.tags.map((tag) => (
                     <View
                       key={tag}
-                      style={[styles.tagPill, { backgroundColor: colorForTag(tag) }]}
+                      style={[
+                        styles.tagPill,
+                        { backgroundColor: colorForTag(tag) },
+                      ]}
                     >
                       <Text style={styles.tagPillText}>{tag}</Text>
                     </View>
@@ -158,7 +207,7 @@ export function EventDetailsModal({ event, visible, onClose, onEventUpdate }: Pr
               )}
               <Text style={styles.detailDescription}>
                 {currentEvent.description ||
-                  'No description has been added for this event.'}
+                  "No description has been added for this event."}
               </Text>
             </View>
 
@@ -178,12 +227,15 @@ export function EventDetailsModal({ event, visible, onClose, onEventUpdate }: Pr
                 style={[
                   styles.rsvpButton,
                   isAttending && styles.rsvpButtonActive,
-                  (rsvpSaving || !currentUid || !currentEvent.id) && styles.rsvpButtonDisabled,
+                  (rsvpSaving || !currentUid || !currentEvent.id) &&
+                    styles.rsvpButtonDisabled,
                 ]}
                 activeOpacity={0.85}
               >
                 {rsvpSaving ? (
-                  <ActivityIndicator color={isAttending ? '#FFFFFF' : palette.coral} />
+                  <ActivityIndicator
+                    color={isAttending ? "#FFFFFF" : palette.coral}
+                  />
                 ) : (
                   <Text
                     style={[
@@ -191,7 +243,7 @@ export function EventDetailsModal({ event, visible, onClose, onEventUpdate }: Pr
                       isAttending && styles.rsvpButtonTextActive,
                     ]}
                   >
-                    {isAttending ? "✓ I'm going" : 'RSVP'}
+                    {isAttending ? "✓ I'm going" : "RSVP"}
                   </Text>
                 )}
               </TouchableOpacity>
@@ -208,12 +260,12 @@ export function EventDetailsModal({ event, visible, onClose, onEventUpdate }: Pr
                       ) : (
                         <View style={styles.attendeeAvatarPlaceholder}>
                           <Text style={styles.attendeeAvatarText}>
-                            {a.display_name?.[0] ?? '?'}
+                            {a.display_name?.[0] ?? "?"}
                           </Text>
                         </View>
                       )}
                       <Text style={styles.attendeeName}>
-                        {a.display_name ?? 'Anonymous'}
+                        {a.display_name ?? "Anonymous"}
                       </Text>
                     </View>
                   ))}
@@ -251,9 +303,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   modalHeader: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'center',
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "center",
     paddingHorizontal: 16,
     paddingBottom: 12,
     paddingTop: 10,
@@ -261,7 +313,7 @@ const styles = StyleSheet.create({
   modalTitle: {
     color: palette.textPrimary,
     fontSize: 20,
-    fontWeight: '800',
+    fontWeight: "800",
   },
   detailContent: {
     gap: 16,
@@ -272,20 +324,20 @@ const styles = StyleSheet.create({
     backgroundColor: palette.border,
     borderRadius: 16,
     height: 220,
-    width: '100%',
+    width: "100%",
   },
   detailImagePlaceholder: {
-    alignItems: 'center',
+    alignItems: "center",
     backgroundColor: palette.coral,
     borderRadius: 16,
     height: 220,
-    justifyContent: 'center',
-    width: '100%',
+    justifyContent: "center",
+    width: "100%",
   },
   detailImagePlaceholderText: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: "700",
     letterSpacing: 0.5,
   },
   detailBody: {
@@ -299,13 +351,13 @@ const styles = StyleSheet.create({
   detailTitle: {
     color: palette.textPrimary,
     fontSize: 25,
-    fontWeight: '800',
+    fontWeight: "800",
   },
   detailWhen: {
-    alignSelf: 'flex-start',
+    alignSelf: "flex-start",
     color: palette.coral,
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: "800",
   },
   detailAddress: {
     color: palette.textMuted,
@@ -318,8 +370,8 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   detailTags: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 8,
     marginTop: 4,
   },
@@ -329,9 +381,9 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
   },
   tagPillText: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   attendeesSection: {
     backgroundColor: palette.card,
@@ -344,7 +396,7 @@ const styles = StyleSheet.create({
   attendeesSectionTitle: {
     color: palette.textPrimary,
     fontSize: 16,
-    fontWeight: '800',
+    fontWeight: "800",
   },
   attendeesSectionSubtitle: {
     color: palette.textMuted,
@@ -352,18 +404,18 @@ const styles = StyleSheet.create({
     marginTop: 3,
   },
   rsvpButton: {
-    alignItems: 'center',
+    alignItems: "center",
     backgroundColor: palette.card,
     borderColor: palette.coral,
     borderRadius: 12,
     borderWidth: 1.5,
     minHeight: 48,
-    justifyContent: 'center',
+    justifyContent: "center",
     ...flatOutline,
   },
   rsvpButtonActive: {
     backgroundColor: palette.coral,
-    ...flatButton('coral'),
+    ...flatButton("coral"),
   },
   rsvpButtonDisabled: {
     opacity: 0.65,
@@ -371,17 +423,17 @@ const styles = StyleSheet.create({
   rsvpButtonText: {
     color: palette.coral,
     fontSize: 15,
-    fontWeight: '800',
+    fontWeight: "800",
   },
   rsvpButtonTextActive: {
-    color: '#fff',
+    color: "#fff",
   },
   attendeeList: {
     gap: 10,
   },
   attendeeRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
+    alignItems: "center",
+    flexDirection: "row",
     gap: 10,
   },
   attendeeAvatar: {
@@ -390,49 +442,49 @@ const styles = StyleSheet.create({
     width: 32,
   },
   attendeeAvatarPlaceholder: {
-    alignItems: 'center',
-    backgroundColor: '#EEF2FF',
+    alignItems: "center",
+    backgroundColor: "#EEF2FF",
     borderRadius: 16,
     height: 32,
-    justifyContent: 'center',
+    justifyContent: "center",
     width: 32,
   },
   attendeeAvatarText: {
     color: palette.coral,
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   attendeeName: {
     color: palette.textPrimary,
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   detailLinkButton: {
-    alignItems: 'center',
+    alignItems: "center",
     backgroundColor: palette.coral,
     borderRadius: 12,
     minHeight: 48,
-    justifyContent: 'center',
-    ...flatButton('coral'),
+    justifyContent: "center",
+    ...flatButton("coral"),
   },
   detailLinkButtonText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   detailCloseButton: {
-    alignItems: 'center',
+    alignItems: "center",
     backgroundColor: palette.card,
     borderColor: palette.border,
     borderRadius: 12,
     borderWidth: 1.5,
     minHeight: 48,
-    justifyContent: 'center',
+    justifyContent: "center",
     ...flatOutline,
   },
   detailCloseButtonText: {
     color: palette.textPrimary,
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: "700",
   },
 });
