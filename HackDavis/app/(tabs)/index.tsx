@@ -15,6 +15,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { API_BASE } from "@/constants/api";
 import { auth } from "../../firebase";
 import { flatButton, flatOutline, palette } from "@/constants/palette";
 import {
@@ -102,11 +103,31 @@ export default function AuthScreen() {
     setLoading(true);
     try {
       if (mode === "login") {
-        await signInWithEmailAndPassword(auth, email, password);
+        const credential = await signInWithEmailAndPassword(auth, email, password);
+        const response = await fetch(`${API_BASE}/api/users/${credential.user.uid}`);
+
+        if (response.ok) {
+          const profile = (await response.json()) as {
+            onboarding_completed?: boolean;
+          };
+          router.replace(profile.onboarding_completed ? "/home" : "/onboarding/step1");
+        } else {
+          router.replace("/home");
+        }
       } else {
-        await createUserWithEmailAndPassword(auth, email, password);
+        const credential = await createUserWithEmailAndPassword(auth, email, password);
+        await fetch(`${API_BASE}/api/users/${credential.user.uid}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            uid: credential.user.uid,
+            email: credential.user.email,
+            display_name: name.trim(),
+            onboarding_completed: false,
+          }),
+        });
+        router.replace("/onboarding/step1");
       }
-      router.replace("/home");
     } catch (error: any) {
       Alert.alert("Error", error.message);
     } finally {
