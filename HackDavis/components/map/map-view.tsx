@@ -1,9 +1,9 @@
-import { StyleSheet, Text, View } from "react-native";
+import { View, Text, StyleSheet } from "react-native";
 
 export default function MapView() {
   return (
     <View style={styles.container}>
-      <Text>Map is not supported on this platform</Text>
+      <Text>Map is not supported on web</Text>
     </View>
   );
 }
