@@ -18,8 +18,14 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { auth } from "../../firebase";
 import { EventDetailsModal } from "@/components/ui/event-details-modal";
 import { API_BASE } from "@/constants/api";
-import { colorForTag, flatButton, flatOutline, palette } from '@/constants/palette';
+import {
+  colorForTag,
+  flatButton,
+  flatOutline,
+  palette,
+} from "@/constants/palette";
 import type { Event } from "@/types/event";
+import AddressAutocomplete from "@/components/address-autocomplete";
 
 const FALLBACK_LOCATION = "Davis, CA";
 const FALLBACK_COORDS = {
@@ -790,7 +796,9 @@ export default function EventsScreen() {
         onClose={() => setSelectedEvent(null)}
         onEventUpdate={(updated) => {
           setSelectedEvent(updated);
-          setEvents((prev) => prev.map((event) => (event.id === updated.id ? updated : event)));
+          setEvents((prev) =>
+            prev.map((event) => (event.id === updated.id ? updated : event))
+          );
         }}
       />
 

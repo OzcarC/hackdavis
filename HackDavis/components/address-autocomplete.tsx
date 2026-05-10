@@ -27,7 +27,7 @@ export default function AddressAutocomplete({
         onFail={(error) => console.error("Places error:", error)}
         onNotFound={() => console.log("Places: no results")}
         query={{
-          key: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
+          key: process.env.EXPO_PUBLIC_GOOGLE_MAPS_KEY,
           language: "en",
         }}
         fetchDetails={true}
