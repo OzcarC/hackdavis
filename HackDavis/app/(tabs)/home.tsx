@@ -1,5 +1,7 @@
-import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import { useRouter } from "expo-router";
+import React, { useState } from "react";
+import { useEventsContext } from "@/context/events-context";
+
 import {
   ActivityIndicator,
   ScrollView,
@@ -7,25 +9,26 @@ import {
   Text,
   TouchableOpacity,
   View,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
-import { EventCard } from '@/components/event-card';
-import { EventDetailsModal } from '@/components/ui/event-details-modal';
-import { fallbackEvents } from '@/constants/fallback-events';
-import { filterEventsByInterests, type Interest } from '@/constants/interests';
-import { flatButton, palette } from '@/constants/palette';
-import { useEvents } from '@/hooks/use-events';
-import type { Event } from '@/types/event';
+import { EventCard } from "@/components/event-card";
+import { EventDetailsModal } from "@/components/ui/event-details-modal";
+import { fallbackEvents } from "@/constants/fallback-events";
+import { filterEventsByInterests, type Interest } from "@/constants/interests";
+import { flatButton, palette } from "@/constants/palette";
+import { useEvents } from "@/hooks/use-events";
+import type { Event } from "@/types/event";
 
-const userInterests: Interest[] = ['Chill', 'Gaming', 'Food'];
+const userInterests: Interest[] = ["Chill", "Gaming", "Food"];
 
 const FOR_YOU_LIMIT = 5;
 const HAPPENING_LIMIT = 6;
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { events, loading, location } = useEvents();
+  const { events, updateEvent } = useEventsContext();
+  const { loading, location } = useEvents();
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
 
   const displayEvents = events.length > 0 ? events : fallbackEvents;
@@ -34,7 +37,7 @@ export default function HomeScreen() {
   const happeningTop = displayEvents.slice(0, HAPPENING_LIMIT);
   const hasMoreHappening = displayEvents.length > HAPPENING_LIMIT;
 
-  const goToEvents = () => router.push('/(tabs)/events');
+  const goToEvents = () => router.push("/(tabs)/events");
   const openEventModal = (event: Event) => setSelectedEvent(event);
   const closeEventModal = () => setSelectedEvent(null);
 
@@ -52,12 +55,17 @@ export default function HomeScreen() {
           <>
             <View style={styles.section}>
               <View style={styles.sectionRow}>
-                <View style={[styles.sectionStripe, { backgroundColor: palette.coral }]} />
+                <View
+                  style={[
+                    styles.sectionStripe,
+                    { backgroundColor: palette.coral },
+                  ]}
+                />
                 <View style={styles.sectionBody}>
                   <View style={styles.sectionHeader}>
                     <Text style={styles.sectionTitle}>For You</Text>
                     <Text style={styles.sectionSubtitle}>
-                      Based on {userInterests.join(' · ')}
+                      Based on {userInterests.join(" · ")}
                     </Text>
                   </View>
 
@@ -65,7 +73,8 @@ export default function HomeScreen() {
                     <View style={styles.emptyCard}>
                       <Text style={styles.emptyTitle}>No matches yet</Text>
                       <Text style={styles.emptyText}>
-                        No events match your interests right now. Browse all events below.
+                        No events match your interests right now. Browse all
+                        events below.
                       </Text>
                     </View>
                   ) : (
@@ -81,8 +90,11 @@ export default function HomeScreen() {
                       <TouchableOpacity
                         activeOpacity={0.85}
                         onPress={goToEvents}
-                        style={styles.viewMoreButton}>
-                        <Text style={styles.viewMoreButtonText}>View more for you</Text>
+                        style={styles.viewMoreButton}
+                      >
+                        <Text style={styles.viewMoreButtonText}>
+                          View more for you
+                        </Text>
                       </TouchableOpacity>
                     </View>
                   )}
@@ -92,13 +104,20 @@ export default function HomeScreen() {
 
             <View style={styles.section}>
               <View style={styles.sectionRow}>
-                <View style={[styles.sectionStripe, { backgroundColor: palette.peach }]} />
+                <View
+                  style={[
+                    styles.sectionStripe,
+                    { backgroundColor: palette.peach },
+                  ]}
+                />
                 <View style={styles.sectionBody}>
                   <View style={styles.sectionHeader}>
                     <Text style={styles.sectionTitle}>
-                      Happening in {location.split(',')[0]}
+                      Happening in {location.split(",")[0]}
                     </Text>
-                    <Text style={styles.sectionSubtitle}>All events near you</Text>
+                    <Text style={styles.sectionSubtitle}>
+                      All events near you
+                    </Text>
                   </View>
 
                   <View style={styles.cardStack}>
@@ -114,7 +133,8 @@ export default function HomeScreen() {
                       <TouchableOpacity
                         activeOpacity={0.85}
                         onPress={goToEvents}
-                        style={styles.viewAllButton}>
+                        style={styles.viewAllButton}
+                      >
                         <Text style={styles.viewAllButtonText}>
                           View all {displayEvents.length} events
                         </Text>
@@ -132,7 +152,10 @@ export default function HomeScreen() {
         event={selectedEvent}
         visible={!!selectedEvent}
         onClose={closeEventModal}
-        onEventUpdate={(updated) => setSelectedEvent(updated)}
+        onEventUpdate={(updated) => {
+          setSelectedEvent(updated);
+          updateEvent(updated);
+        }}
       />
     </SafeAreaView>
   );
@@ -154,7 +177,7 @@ const styles = StyleSheet.create({
   greeting: {
     color: palette.textPrimary,
     fontSize: 28,
-    fontWeight: '700',
+    fontWeight: "700",
     letterSpacing: -0.5,
   },
   location: {
@@ -173,7 +196,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   sectionRow: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 12,
   },
   sectionStripe: {
@@ -186,7 +209,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     color: palette.textPrimary,
     fontSize: 20,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   sectionSubtitle: {
     color: palette.textMuted,
@@ -197,39 +220,39 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   viewMoreButton: {
-    alignItems: 'center',
+    alignItems: "center",
     backgroundColor: palette.coral,
     borderRadius: 14,
     minHeight: 48,
-    justifyContent: 'center',
+    justifyContent: "center",
     marginTop: 8,
-    ...flatButton('coral'),
+    ...flatButton("coral"),
   },
   viewMoreButtonText: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
     fontSize: 14,
-    fontWeight: '700',
+    fontWeight: "700",
     letterSpacing: 0.3,
   },
   viewAllButton: {
-    alignItems: 'center',
+    alignItems: "center",
     backgroundColor: palette.card,
     borderColor: palette.peach,
     borderRadius: 14,
     borderWidth: 1.5,
     minHeight: 44,
-    justifyContent: 'center',
+    justifyContent: "center",
     marginTop: 8,
-    ...flatButton('peach'),
+    ...flatButton("peach"),
   },
   viewAllButtonText: {
     color: palette.peach,
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: "700",
     letterSpacing: 0.3,
   },
   emptyCard: {
-    alignItems: 'center',
+    alignItems: "center",
     backgroundColor: palette.card,
     borderColor: palette.border,
     borderRadius: 14,
@@ -240,12 +263,12 @@ const styles = StyleSheet.create({
   emptyTitle: {
     color: palette.textPrimary,
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   emptyText: {
     color: palette.textMuted,
     fontSize: 13,
     marginTop: 4,
-    textAlign: 'center',
+    textAlign: "center",
   },
 });

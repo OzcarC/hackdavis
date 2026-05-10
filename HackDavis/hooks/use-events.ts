@@ -1,10 +1,11 @@
-import * as Location from 'expo-location';
-import { useEffect, useState } from 'react';
+import * as Location from "expo-location";
+import { useEffect, useState } from "react";
 
-import { API_BASE } from '@/constants/api';
-import type { Event } from '@/types/event';
+import { API_BASE } from "@/constants/api";
+import type { Event } from "@/types/event";
+import { useEventsContext } from "@/context/events-context";
 
-export const FALLBACK_LOCATION = 'Davis, CA';
+export const FALLBACK_LOCATION = "Davis, CA";
 export const FALLBACK_COORDS = {
   latitude: 38.5449,
   longitude: -121.7405,
@@ -30,7 +31,10 @@ type Result = {
   reload: () => void;
 };
 
-export const useEvents = ({ dateFilter = 'date:week', radiusMeters = 25000 }: Options = {}): Result => {
+export const useEvents = ({
+  dateFilter = "date:week",
+  radiusMeters = 25000,
+}: Options = {}): Result => {
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [locationLoading, setLocationLoading] = useState(true);
@@ -60,7 +64,9 @@ export const useEvents = ({ dateFilter = 'date:week', radiusMeters = 25000 }: Op
           longitude: currentPosition.coords.longitude,
         });
 
-        const [place] = await Location.reverseGeocodeAsync(currentPosition.coords);
+        const [place] = await Location.reverseGeocodeAsync(
+          currentPosition.coords
+        );
         const city = place?.city ?? place?.subregion ?? place?.district;
         const region = place?.region;
 
@@ -92,7 +98,7 @@ export const useEvents = ({ dateFilter = 'date:week', radiusMeters = 25000 }: Op
 
       try {
         const params = new URLSearchParams({
-          query: 'events near me',
+          query: "events near me",
           location,
           lat: String(coordinates.latitude),
           lng: String(coordinates.longitude),
@@ -105,21 +111,33 @@ export const useEvents = ({ dateFilter = 'date:week', radiusMeters = 25000 }: Op
         const response = await fetch(eventsUrl);
 
         if (!response.ok) {
-          throw new Error(`Events request failed with status ${response.status}`);
+          throw new Error(
+            `Events request failed with status ${response.status}`
+          );
         }
 
         const data = (await response.json()) as Event[];
         setEvents(data);
       } catch (eventError) {
         console.error(eventError);
-        setError(`Could not load events from ${API_BASE}. Check that the backend is running.`);
+        setError(
+          `Could not load events from ${API_BASE}. Check that the backend is running.`
+        );
       } finally {
         setLoading(false);
       }
     };
 
     fetchEvents();
-  }, [coordinates.latitude, coordinates.longitude, location, dateFilter, radiusMeters, locationLoading, reloadToken]);
+  }, [
+    coordinates.latitude,
+    coordinates.longitude,
+    location,
+    dateFilter,
+    radiusMeters,
+    locationLoading,
+    reloadToken,
+  ]);
 
   return {
     events,

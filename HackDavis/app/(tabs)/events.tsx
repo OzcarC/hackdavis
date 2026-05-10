@@ -1,6 +1,8 @@
 import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
 import React, { useEffect, useState } from "react";
+import { useEventsContext } from "@/context/events-context";
+
 import {
   ActivityIndicator,
   Alert,
@@ -26,6 +28,9 @@ import {
 } from "@/constants/palette";
 import type { Event } from "@/types/event";
 import AddressAutocomplete from "@/components/address-autocomplete";
+import { LogBox } from "react-native";
+
+LogBox.ignoreLogs(["VirtualizedLists should never be nested"]);
 
 const FALLBACK_LOCATION = "Davis, CA";
 const FALLBACK_COORDS = {
@@ -162,7 +167,7 @@ const formatEventWhen = (date: Date) => {
 };
 
 export default function EventsScreen() {
-  const [events, setEvents] = useState<Event[]>([]);
+  const { events, setEvents, updateEvent } = useEventsContext();
   const [loading, setLoading] = useState(true);
   const [locationLoading, setLocationLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -796,9 +801,7 @@ export default function EventsScreen() {
         onClose={() => setSelectedEvent(null)}
         onEventUpdate={(updated) => {
           setSelectedEvent(updated);
-          setEvents((prev) =>
-            prev.map((event) => (event.id === updated.id ? updated : event))
-          );
+          updateEvent(updated);
         }}
       />
 

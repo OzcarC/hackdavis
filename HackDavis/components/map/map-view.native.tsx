@@ -15,6 +15,7 @@ import { EventDetailsModal } from "@/components/ui/event-details-modal";
 import type { Event } from "@/types/event";
 import { API_BASE } from "../../constants/api";
 import { flatButton, palette } from "../../constants/palette";
+import { useEventsContext } from "@/context/events-context";
 
 const TAG_BG = "#EEF2FF";
 const TAG_TEXT = "#4F46E5";
@@ -106,7 +107,7 @@ const eventCoordinate = (event: Event) => {
 
 export default function MapScreen() {
   const [initialRegion, setInitialRegion] = useState<Region | null>(null);
-  const [events, setEvents] = useState<Event[]>([]);
+  const { events, setEvents, updateEvent } = useEventsContext();
   const [eventsLoading, setEventsLoading] = useState(false);
   const [eventsError, setEventsError] = useState<string | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
@@ -114,8 +115,8 @@ export default function MapScreen() {
   const nearbyEventLabel = eventsError
     ? eventsError
     : eventsLoading
-      ? "Loading nearby events"
-      : `${events.length} event${events.length === 1 ? "" : "s"} near you`;
+    ? "Loading nearby events"
+    : `${events.length} event${events.length === 1 ? "" : "s"} near you`;
 
   useEffect(() => {
     (async () => {
@@ -302,7 +303,9 @@ export default function MapScreen() {
         })}
       </MapView>
       <View pointerEvents="none" style={styles.statusBadge}>
-        {eventsLoading && <ActivityIndicator color={palette.card} size="small" />}
+        {eventsLoading && (
+          <ActivityIndicator color={palette.card} size="small" />
+        )}
         <Text style={styles.statusBadgeText}>{nearbyEventLabel}</Text>
       </View>
       {Platform.OS === "android" && selectedEvent && (
@@ -379,10 +382,8 @@ export default function MapScreen() {
         onClose={() => setDetailsEvent(null)}
         onEventUpdate={(updated) => {
           setDetailsEvent(updated);
-          setSelectedEvent((current) => (current?.id === updated.id ? updated : current));
-          setEvents((currentEvents) =>
-            currentEvents.map((event) => (event.id === updated.id ? updated : event))
-          );
+          setSelectedEvent(updated);
+          updateEvent(updated);
         }}
       />
     </View>
@@ -609,7 +610,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginTop: 12,
     minHeight: 44,
-    ...flatButton('coral'),
+    ...flatButton("coral"),
   },
   previewDetailsText: {
     color: palette.card,
