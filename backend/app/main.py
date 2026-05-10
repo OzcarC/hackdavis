@@ -60,7 +60,7 @@ async def upsert_user_profile(
 
     saved = await db.user_profiles.find_one_and_update(
         {"uid": uid},
-        {"$set": profile.model_dump()},
+        {"$set": profile.model_dump(exclude_unset=True)},
         upsert=True,
         return_document=ReturnDocument.AFTER,
     )
