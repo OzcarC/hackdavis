@@ -197,6 +197,8 @@ export default function EventsScreen() {
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [eventLocation, setEventLocation] = useState(FALLBACK_LOCATION);
   const [eventCoordinates, setEventCoordinates] = useState(FALLBACK_COORDS);
+  const [locationSearch, setLocationSearch] = useState("");
+  const [locationSearching, setLocationSearching] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [savingEvent, setSavingEvent] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -371,6 +373,45 @@ export default function EventsScreen() {
     );
   };
 
+  const searchEventsLocation = async () => {
+    const query = locationSearch.trim();
+
+    if (!query) {
+      Alert.alert("Missing location", "Enter a city or address to search.");
+      return;
+    }
+
+    setLocationSearching(true);
+    setError(null);
+
+    try {
+      const geocodedLocations = await withTimeout(
+        Location.geocodeAsync(query),
+        8000,
+        "Location search timed out."
+      );
+      const result = geocodedLocations[0];
+
+      if (!result) {
+        Alert.alert("Location not found", "Try a more specific city or address.");
+        return;
+      }
+
+      setEventCoordinates({
+        latitude: result.latitude,
+        longitude: result.longitude,
+      });
+      setEventLocation(query);
+      setSelectedTag(null);
+      setRefreshKey((key) => key + 1);
+    } catch (searchError) {
+      console.error(searchError);
+      Alert.alert("Search failed", "Could not find events around that location.");
+    } finally {
+      setLocationSearching(false);
+    }
+  };
+
   const setQuickDate = (offsetDays: number) => {
     const nextDate = new Date();
     nextDate.setDate(nextDate.getDate() + offsetDays);
@@ -521,6 +562,34 @@ export default function EventsScreen() {
         <Text style={styles.subheading}>
           Showing events around {eventLocation}.
         </Text>
+      </View>
+
+      <View style={styles.locationSearch}>
+        <TextInput
+          autoCapitalize="words"
+          onChangeText={setLocationSearch}
+          onSubmitEditing={searchEventsLocation}
+          placeholder="Search city or address"
+          placeholderTextColor={palette.textSubtle}
+          returnKeyType="search"
+          style={styles.locationSearchInput}
+          value={locationSearch}
+        />
+        <TouchableOpacity
+          activeOpacity={0.85}
+          disabled={locationSearching}
+          onPress={searchEventsLocation}
+          style={[
+            styles.locationSearchButton,
+            locationSearching && styles.locationSearchButtonDisabled,
+          ]}
+        >
+          {locationSearching ? (
+            <ActivityIndicator color="#fff" size="small" />
+          ) : (
+            <Text style={styles.locationSearchButtonText}>Search</Text>
+          )}
+        </TouchableOpacity>
       </View>
 
       <Modal
@@ -1200,6 +1269,41 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginTop: 4,
   },
+  locationSearch: {
+    flexDirection: "row",
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingTop: 4,
+    paddingBottom: 8,
+  },
+  locationSearchInput: {
+    backgroundColor: palette.card,
+    borderColor: palette.border,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    color: palette.textPrimary,
+    flex: 1,
+    fontSize: 15,
+    minHeight: 46,
+    paddingHorizontal: 14,
+  },
+  locationSearchButton: {
+    alignItems: "center",
+    backgroundColor: palette.navy,
+    borderRadius: 12,
+    justifyContent: "center",
+    minHeight: 46,
+    paddingHorizontal: 16,
+    ...flatButton("navy"),
+  },
+  locationSearchButtonDisabled: {
+    opacity: 0.6,
+  },
+  locationSearchButtonText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "700",
+  },
   modalSafe: {
     backgroundColor: palette.bg,
     flex: 1,
@@ -1543,16 +1647,19 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     gap: 8,
     paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 10,
+    paddingTop: 14,
+    paddingBottom: 12,
   },
   chip: {
+    alignItems: "center",
     backgroundColor: palette.card,
     borderColor: palette.border,
     borderRadius: 20,
     borderWidth: 1.5,
+    justifyContent: "center",
+    minHeight: 42,
     paddingHorizontal: 14,
-    paddingVertical: 7,
+    paddingVertical: 0,
   },
   chipActive: {
     backgroundColor: palette.coral,
@@ -1562,27 +1669,32 @@ const styles = StyleSheet.create({
     color: palette.textPrimary,
     fontSize: 13,
     fontWeight: "500",
+    lineHeight: 18,
   },
   chipTextActive: {
     color: "#fff",
   },
   tagFilterRow: {
     flexGrow: 0,
-    height: 48,
+    minHeight: 58,
   },
   tagFilterContent: {
     alignItems: "center",
     gap: 8,
     paddingHorizontal: 16,
-    paddingBottom: 6,
+    paddingBottom: 12,
+    paddingTop: 2,
   },
   filterTag: {
+    alignItems: "center",
     backgroundColor: palette.card,
     borderColor: palette.border,
     borderRadius: 16,
     borderWidth: 1.5,
+    justifyContent: "center",
+    minHeight: 42,
     paddingHorizontal: 12,
-    paddingVertical: 7,
+    paddingVertical: 0,
   },
   filterTagActive: {
     backgroundColor: palette.navy,
@@ -1592,6 +1704,7 @@ const styles = StyleSheet.create({
     color: palette.textPrimary,
     fontSize: 13,
     fontWeight: "600",
+    lineHeight: 18,
   },
   filterTagTextActive: {
     color: "#fff",
@@ -1602,7 +1715,7 @@ const styles = StyleSheet.create({
   list: {
     gap: 12,
     padding: 16,
-    paddingTop: 0,
+    paddingTop: 4,
   },
   card: {
     backgroundColor: palette.card,
