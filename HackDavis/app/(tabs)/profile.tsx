@@ -41,6 +41,16 @@ type Event = {
   author?: string | null;
 };
 
+const isPastEvent = (event: Event): boolean => {
+  if (!event.date?.start_date) return false;
+  try {
+    const eventDate = new Date(event.date.start_date);
+    return eventDate < new Date();
+  } catch {
+    return false;
+  }
+};
+
 export default function ProfileScreen() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [hostedEvents, setHostedEvents] = useState<Event[]>([]);
@@ -170,6 +180,8 @@ export default function ProfileScreen() {
 
   const displayName = profile?.display_name || user?.displayName || user?.email?.split('@')[0] || 'You';
   const initials = displayName.charAt(0).toUpperCase();
+  const upcomingEvents = attendingEvents.filter((event) => !isPastEvent(event));
+  const attendedEvents = attendingEvents.filter((event) => isPastEvent(event));
   const totalEvents = hostedEvents.length + attendingEvents.length;
 
   const renderEventCard = (item: Event) => (
@@ -296,9 +308,15 @@ export default function ProfileScreen() {
                 <Text style={styles.statLabel}>Hosting</Text>
               </View>
               <View style={styles.statItem}>
-                <Text style={styles.statNumber}>{attendingEvents.length}</Text>
+                <Text style={styles.statNumber}>{upcomingEvents.length}</Text>
                 <Text style={styles.statLabel}>Attending</Text>
               </View>
+              {attendedEvents.length > 0 && (
+                <View style={styles.statItem}>
+                  <Text style={styles.statNumber}>{attendedEvents.length}</Text>
+                  <Text style={styles.statLabel}>Attended</Text>
+                </View>
+              )}
             </View>
 
             {/* Divider + section title */}
@@ -328,8 +346,8 @@ export default function ProfileScreen() {
               totalEvents > 0 ? (
                 <ActivityIndicator color="#6366F1" style={{ marginTop: 16 }} />
               ) : null
-            ) : attendingEvents.length > 0 ? (
-              attendingEvents.map((event, index) => (
+            ) : upcomingEvents.length > 0 ? (
+              upcomingEvents.map((event, index) => (
                 <View key={event.id ?? `attending-${index}`}>
                   {renderEventCard(event)}
                 </View>
@@ -340,6 +358,19 @@ export default function ProfileScreen() {
                 <Text style={styles.emptyTitle}>No RSVPs yet</Text>
                 <Text style={styles.emptyText}>Events you RSVP to will show up here.</Text>
               </View>
+            )}
+
+            {!eventsLoading && attendedEvents.length > 0 && (
+              <>
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>Attended</Text>
+                </View>
+                {attendedEvents.map((event, index) => (
+                  <View key={event.id ?? `attended-${index}`}>
+                    {renderEventCard(event)}
+                  </View>
+                ))}
+              </>
             )}
           </>
         }
