@@ -16,6 +16,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { API_BASE } from '@/constants/api';
+import { colorForTag, palette } from '@/constants/palette';
 import { auth } from '../../firebase';
 
 type UserProfile = {
@@ -154,7 +155,7 @@ export default function ProfileScreen() {
   if (loading) {
     return (
       <SafeAreaView style={styles.safe}>
-        <ActivityIndicator color="#6366F1" style={styles.loader} />
+        <ActivityIndicator color={palette.coral} style={styles.loader} />
       </SafeAreaView>
     );
   }
@@ -181,7 +182,7 @@ export default function ProfileScreen() {
               <TextInput
                 onChangeText={setEditName}
                 placeholder="Your name"
-                placeholderTextColor="#9CA3AF"
+                placeholderTextColor={palette.textSubtle}
                 style={styles.input}
                 value={editName}
               />
@@ -192,7 +193,7 @@ export default function ProfileScreen() {
                 multiline
                 onChangeText={setEditBio}
                 placeholder="Tell people a bit about yourself"
-                placeholderTextColor="#9CA3AF"
+                placeholderTextColor={palette.textSubtle}
                 style={[styles.input, styles.textArea]}
                 textAlignVertical="top"
                 value={editBio}
@@ -220,7 +221,7 @@ export default function ProfileScreen() {
                     </View>
                   )}
                   <View style={styles.cameraBadge}>
-                    <Text style={styles.cameraBadgeText}>📷</Text>
+                    <Text style={styles.cameraBadgeText}>+</Text>
                   </View>
                 </View>
               </TouchableOpacity>
@@ -254,10 +255,9 @@ export default function ProfileScreen() {
         }
         ListEmptyComponent={
           eventsLoading ? (
-            <ActivityIndicator color="#6366F1" style={{ marginTop: 32 }} />
+            <ActivityIndicator color={palette.coral} style={{ marginTop: 32 }} />
           ) : (
             <View style={styles.emptyBox}>
-              <Text style={styles.emptyIcon}>🗓️</Text>
               <Text style={styles.emptyTitle}>No events yet</Text>
               <Text style={styles.emptyText}>Events you post will show up here.</Text>
             </View>
@@ -269,7 +269,7 @@ export default function ProfileScreen() {
               <Image source={{ uri: item.thumbnail }} style={styles.eventThumb} />
             ) : (
               <View style={styles.eventThumbPlaceholder}>
-                <Text style={styles.eventThumbPlaceholderText}>📅</Text>
+                <Text style={styles.eventThumbPlaceholderText}>Event</Text>
               </View>
             )}
             <View style={styles.eventInfo}>
@@ -283,7 +283,9 @@ export default function ProfileScreen() {
               {!!item.tags?.length && (
                 <View style={styles.eventTags}>
                   {item.tags.slice(0, 3).map((tag) => (
-                    <View key={tag} style={styles.tagPill}>
+                    <View
+                      key={tag}
+                      style={[styles.tagPill, { backgroundColor: colorForTag(tag) }]}>
                       <Text style={styles.tagPillText}>{tag}</Text>
                     </View>
                   ))}
@@ -298,7 +300,7 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { backgroundColor: '#F9FAFB', flex: 1 },
+  safe: { backgroundColor: palette.bg, flex: 1 },
   loader: { marginTop: 40 },
 
   listContainer: { paddingBottom: 32 },
@@ -318,20 +320,20 @@ const styles = StyleSheet.create({
     height: 88,
     borderRadius: 44,
     borderWidth: 3,
-    borderColor: '#F9FAFB',
-    backgroundColor: '#E5E7EB',
+    borderColor: palette.bg,
+    backgroundColor: palette.border,
   },
   avatarPlaceholder: {
     width: 88,
     height: 88,
     borderRadius: 44,
     borderWidth: 3,
-    borderColor: '#F9FAFB',
-    backgroundColor: '#EEF2FF',
+    borderColor: palette.bg,
+    backgroundColor: palette.coral,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarInitials: { color: '#6366F1', fontSize: 34, fontWeight: '700' },
+  avatarInitials: { color: '#FFFFFF', fontSize: 34, fontWeight: '700' },
   cameraBadge: {
     position: 'absolute',
     bottom: 0,
@@ -339,7 +341,7 @@ const styles = StyleSheet.create({
     width: 26,
     height: 26,
     borderRadius: 13,
-    backgroundColor: '#fff',
+    backgroundColor: palette.card,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
@@ -347,23 +349,23 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
-  cameraBadgeText: { fontSize: 13 },
+  cameraBadgeText: { fontSize: 16, color: palette.coral, fontWeight: '700', lineHeight: 18 },
 
   editButton: {
     borderWidth: 1.5,
-    borderColor: '#D1D5DB',
+    borderColor: palette.border,
     borderRadius: 20,
     paddingHorizontal: 16,
     paddingVertical: 7,
-    backgroundColor: '#fff',
+    backgroundColor: palette.card,
   },
-  editButtonText: { color: '#111827', fontSize: 13, fontWeight: '600' },
+  editButtonText: { color: palette.textPrimary, fontSize: 13, fontWeight: '600' },
 
   // Name / bio
   nameSection: { paddingHorizontal: 16, gap: 3, marginBottom: 16 },
-  displayName: { color: '#111827', fontSize: 22, fontWeight: '700' },
-  email: { color: '#9CA3AF', fontSize: 13 },
-  bio: { color: '#374151', fontSize: 14, lineHeight: 20, marginTop: 6 },
+  displayName: { color: palette.textPrimary, fontSize: 22, fontWeight: '700' },
+  email: { color: palette.textSubtle, fontSize: 13 },
+  bio: { color: palette.textPrimary, fontSize: 14, lineHeight: 20, marginTop: 6 },
 
   // Stats
   statsRow: {
@@ -371,11 +373,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    borderBottomColor: palette.border,
   },
   statItem: { alignItems: 'center', marginRight: 28 },
-  statNumber: { color: '#111827', fontSize: 20, fontWeight: '700' },
-  statLabel: { color: '#6B7280', fontSize: 12, marginTop: 1 },
+  statNumber: { color: palette.textPrimary, fontSize: 20, fontWeight: '700' },
+  statLabel: { color: palette.textMuted, fontSize: 12, marginTop: 1 },
 
   // Section header
   sectionHeader: {
@@ -383,74 +385,74 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     paddingBottom: 10,
   },
-  sectionTitle: { color: '#111827', fontSize: 17, fontWeight: '700' },
+  sectionTitle: { color: palette.textPrimary, fontSize: 17, fontWeight: '700' },
 
   // Event cards
   eventCard: {
     flexDirection: 'row',
-    backgroundColor: '#fff',
+    backgroundColor: palette.card,
     borderRadius: 14,
     marginHorizontal: 16,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: '#F3F4F6',
+    borderColor: palette.border,
     overflow: 'hidden',
     shadowColor: '#000',
     shadowOpacity: 0.04,
     shadowRadius: 6,
     elevation: 1,
   },
-  eventThumb: { width: 88, backgroundColor: '#E5E7EB', alignSelf: 'stretch' },
+  eventThumb: { width: 88, backgroundColor: palette.border, alignSelf: 'stretch' },
   eventThumbPlaceholder: {
     width: 88,
-    backgroundColor: '#EEF2FF',
+    backgroundColor: palette.coral,
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: 96,
   },
-  eventThumbPlaceholderText: { fontSize: 24 },
+  eventThumbPlaceholderText: { color: '#FFFFFF', fontSize: 12, fontWeight: '700', letterSpacing: 0.5 },
   eventInfo: { flex: 1, padding: 12, gap: 3 },
-  eventTitle: { color: '#111827', fontSize: 15, fontWeight: '600' },
-  eventWhen: { color: '#6366F1', fontSize: 12, fontWeight: '600' },
-  eventAddress: { color: '#6B7280', fontSize: 12 },
+  eventTitle: { color: palette.textPrimary, fontSize: 15, fontWeight: '600' },
+  eventWhen: { color: palette.coral, fontSize: 12, fontWeight: '600' },
+  eventAddress: { color: palette.textMuted, fontSize: 12 },
   eventTags: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginTop: 5 },
   tagPill: {
-    backgroundColor: '#EEF2FF', borderRadius: 10,
-    paddingHorizontal: 8, paddingVertical: 3,
+    borderRadius: 10,
+    paddingHorizontal: 10, paddingVertical: 3,
   },
-  tagPillText: { color: '#6366F1', fontSize: 10, fontWeight: '700' },
+  tagPillText: { color: '#FFFFFF', fontSize: 10, fontWeight: '700' },
 
   // Empty state
   emptyBox: { alignItems: 'center', paddingVertical: 40, paddingHorizontal: 32 },
   emptyIcon: { fontSize: 40, marginBottom: 12 },
-  emptyTitle: { color: '#111827', fontSize: 16, fontWeight: '700', marginBottom: 6 },
-  emptyText: { color: '#6B7280', fontSize: 14, textAlign: 'center' },
+  emptyTitle: { color: palette.textPrimary, fontSize: 16, fontWeight: '700', marginBottom: 6 },
+  emptyText: { color: palette.textMuted, fontSize: 14, textAlign: 'center' },
 
   // Edit modal
-  modalSafe: { backgroundColor: '#F9FAFB', flex: 1 },
+  modalSafe: { backgroundColor: palette.bg, flex: 1 },
   modalHeader: {
     alignItems: 'center',
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: palette.border,
     borderBottomWidth: 1,
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 14,
   },
-  modalTitle: { color: '#111827', fontSize: 16, fontWeight: '700' },
+  modalTitle: { color: palette.textPrimary, fontSize: 16, fontWeight: '700' },
   modalCancel: { minWidth: 60 },
-  modalCancelText: { color: '#6B7280', fontSize: 15 },
+  modalCancelText: { color: palette.textMuted, fontSize: 15 },
   modalSaveBtn: { minWidth: 60, alignItems: 'flex-end' },
-  modalSaveText: { color: '#6366F1', fontSize: 15, fontWeight: '700' },
+  modalSaveText: { color: palette.coral, fontSize: 15, fontWeight: '700' },
   form: { gap: 16, padding: 16 },
   fieldGroup: { gap: 6 },
-  label: { color: '#374151', fontSize: 13, fontWeight: '600' },
+  label: { color: palette.textPrimary, fontSize: 13, fontWeight: '600' },
   input: {
-    backgroundColor: '#fff',
-    borderColor: '#E5E7EB',
+    backgroundColor: palette.card,
+    borderColor: palette.border,
     borderRadius: 12,
     borderWidth: 1.5,
-    color: '#111827',
+    color: palette.textPrimary,
     fontSize: 15,
     minHeight: 48,
     paddingHorizontal: 14,

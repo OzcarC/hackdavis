@@ -16,6 +16,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { auth } from "../../firebase";
+import { palette } from "@/constants/palette";
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
@@ -24,7 +25,7 @@ import {
 
 type Mode = "login" | "signup";
 
-const ACCENT = "#6366F1";
+const ACCENT = palette.coral;
 
 export default function AuthScreen() {
   const router = useRouter();
@@ -209,7 +210,7 @@ export default function AuthScreen() {
                     autoCapitalize="words"
                     onChangeText={setName}
                     placeholder="Jane Smith"
-                    placeholderTextColor="#9CA3AF"
+                    placeholderTextColor={palette.textSubtle}
                     returnKeyType="next"
                     style={styles.input}
                     value={name}
@@ -225,7 +226,7 @@ export default function AuthScreen() {
                   keyboardType="email-address"
                   onChangeText={setEmail}
                   placeholder="you@example.com"
-                  placeholderTextColor="#9CA3AF"
+                  placeholderTextColor={palette.textSubtle}
                   returnKeyType="next"
                   style={styles.input}
                   value={email}
@@ -241,7 +242,7 @@ export default function AuthScreen() {
                       mode === "login" ? handleSubmit : undefined
                     }
                     placeholder="Min. 8 characters"
-                    placeholderTextColor="#9CA3AF"
+                    placeholderTextColor={palette.textSubtle}
                     returnKeyType={mode === "signup" ? "next" : "done"}
                     secureTextEntry={!showPassword}
                     style={[styles.input, styles.passwordInput]}
@@ -268,7 +269,7 @@ export default function AuthScreen() {
                     onChangeText={setConfirmPassword}
                     onSubmitEditing={handleSubmit}
                     placeholder="Repeat your password"
-                    placeholderTextColor="#9CA3AF"
+                    placeholderTextColor={palette.textSubtle}
                     returnKeyType="done"
                     secureTextEntry={!showPassword}
                     style={styles.input}
@@ -339,7 +340,7 @@ export default function AuthScreen() {
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: "#F9FAFB",
+    backgroundColor: palette.bg,
   },
   flex: {
     flex: 1,
@@ -360,17 +361,17 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   title: {
-    color: "#111827",
+    color: palette.textPrimary,
     fontSize: 26,
     fontWeight: "700",
     marginBottom: 4,
   },
   subtitle: {
-    color: "#6B7280",
+    color: palette.textMuted,
     fontSize: 15,
   },
   card: {
-    backgroundColor: "#fff",
+    backgroundColor: palette.card,
     borderRadius: 20,
     elevation: 4,
     padding: 24,
@@ -380,7 +381,7 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
   },
   tabs: {
-    backgroundColor: "#F3F4F6",
+    backgroundColor: palette.border,
     borderRadius: 10,
     flexDirection: "row",
     marginBottom: 24,
@@ -388,7 +389,7 @@ const styles = StyleSheet.create({
     position: "relative",
   },
   tabIndicator: {
-    backgroundColor: "#fff",
+    backgroundColor: palette.card,
     borderRadius: 8,
     bottom: 4,
     elevation: 2,
@@ -407,12 +408,12 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   tabText: {
-    color: "#9CA3AF",
+    color: palette.textSubtle,
     fontSize: 14,
     fontWeight: "500",
   },
   tabTextActive: {
-    color: "#111827",
+    color: palette.textPrimary,
   },
   fields: {
     gap: 16,
@@ -421,16 +422,16 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   label: {
-    color: "#374151",
+    color: palette.textPrimary,
     fontSize: 13,
     fontWeight: "600",
   },
   input: {
-    backgroundColor: "#FAFAFA",
-    borderColor: "#E5E7EB",
+    backgroundColor: palette.bg,
+    borderColor: palette.border,
     borderRadius: 12,
     borderWidth: 1.5,
-    color: "#111827",
+    color: palette.textPrimary,
     fontSize: 15,
     height: 48,
     paddingHorizontal: 14,
@@ -446,9 +447,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   eyeBtn: {
-    backgroundColor: "#FAFAFA",
+    backgroundColor: palette.bg,
     borderBottomRightRadius: 12,
-    borderColor: "#E5E7EB",
+    borderColor: palette.border,
     borderTopRightRadius: 12,
     borderWidth: 1.5,
     height: 48,
@@ -491,18 +492,18 @@ const styles = StyleSheet.create({
     marginVertical: 20,
   },
   dividerLine: {
-    backgroundColor: "#E5E7EB",
+    backgroundColor: palette.border,
     flex: 1,
     height: 1,
   },
   dividerText: {
-    color: "#9CA3AF",
+    color: palette.textSubtle,
     fontSize: 13,
   },
   socialBtn: {
     alignItems: "center",
-    backgroundColor: "#fff",
-    borderColor: "#E5E7EB",
+    backgroundColor: palette.card,
+    borderColor: palette.border,
     borderRadius: 12,
     borderWidth: 1.5,
     flexDirection: "row",
@@ -512,12 +513,12 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   socialIcon: {
-    color: "#374151",
+    color: palette.textPrimary,
     fontSize: 16,
     fontWeight: "700",
   },
   socialText: {
-    color: "#374151",
+    color: palette.textPrimary,
     fontSize: 15,
     fontWeight: "500",
   },
@@ -527,7 +528,7 @@ const styles = StyleSheet.create({
     marginTop: 24,
   },
   footerText: {
-    color: "#6B7280",
+    color: palette.textMuted,
     fontSize: 14,
   },
   footerLink: {
