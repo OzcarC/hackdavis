@@ -8,6 +8,14 @@ export const interestOptions = [
   'Icebreaker',
   'Gaming',
   'Nature',
+  'Professional',
+  'Casual',
+  'Creative',
+  'Competitive',
+  'Quick Meetups',
+  'Reoccuring Events',
+  'Skill Building',
+  'Other',
 ] as const;
 
 export type Interest = (typeof interestOptions)[number];

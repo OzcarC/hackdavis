@@ -43,6 +43,14 @@ class UserProfileIn(BaseModel):
     display_name: str | None = None
     bio: str | None = None
     photo: str | None = None
+    personality_type: str | None = None
+    interests: list[str] = Field(default_factory=list)
+    preferred_tags: list[str] = Field(default_factory=list)
+    availability: list[str] = Field(default_factory=list)
+    home_location: str | None = None
+    free_time_activities: list[str] = Field(default_factory=list)
+    onboarding_answers: dict[str, Any] = Field(default_factory=dict)
+    onboarding_completed: bool = False
 
 
 class UserProfileOut(UserProfileIn):
@@ -74,4 +82,12 @@ def serialize_user_profile(profile: dict[str, Any]) -> UserProfileOut:
         display_name=profile.get("display_name"),
         bio=profile.get("bio"),
         photo=profile.get("photo"),
+        personality_type=profile.get("personality_type"),
+        interests=profile.get("interests", []),
+        preferred_tags=profile.get("preferred_tags", []),
+        availability=profile.get("availability", []),
+        home_location=profile.get("home_location"),
+        free_time_activities=profile.get("free_time_activities", []),
+        onboarding_answers=profile.get("onboarding_answers", {}),
+        onboarding_completed=profile.get("onboarding_completed", False),
     )

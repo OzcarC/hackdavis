@@ -6,7 +6,6 @@ import {
   Alert,
   FlatList,
   Image,
-  Linking,
   Modal,
   ScrollView,
   StyleSheet,
@@ -17,14 +16,10 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { auth } from "../../firebase";
+import { EventDetailsModal } from "@/components/ui/event-details-modal";
 import { API_BASE } from "@/constants/api";
-import {
-  colorForTag,
-  flatButton,
-  flatOutline,
-  palette,
-} from "@/constants/palette";
-import AddressAutocomplete from "@/components/address-autocomplete";
+import { colorForTag, flatButton, flatOutline, palette } from '@/constants/palette';
+import type { Event } from "@/types/event";
 
 const FALLBACK_LOCATION = "Davis, CA";
 const FALLBACK_COORDS = {
@@ -47,40 +42,6 @@ const withTimeout = async <T,>(
   } finally {
     clearTimeout(timeoutId!);
   }
-};
-
-type Attendee = {
-  uid: string;
-  display_name?: string | null;
-  photo?: string | null;
-};
-
-type UserProfile = {
-  uid: string;
-  email?: string | null;
-  display_name?: string | null;
-  photo?: string | null;
-};
-
-type Event = {
-  id?: string;
-  title: string;
-  date?: {
-    start_date?: string | null;
-    when?: string | null;
-  } | null;
-  address?: string[];
-  link?: string | null;
-  thumbnail?: string | null;
-  description?: string | null;
-  tags?: string[];
-  source?: string;
-  author?: string | null;
-  location?: {
-    type: "Point";
-    coordinates: number[];
-  } | null;
-  attendees?: Attendee[];
 };
 
 const eventTagOptions = [
@@ -224,44 +185,9 @@ export default function EventsScreen() {
   const [newThumbnail, setNewThumbnail] = useState<string | null>(null);
   const [newTags, setNewTags] = useState<string[]>([]);
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
-  const [currentProfile, setCurrentProfile] = useState<UserProfile | null>(
-    null
-  );
 
   const currentUser = auth.currentUser;
   const calendarDays = calendarDaysForMonth(calendarMonth);
-
-  useEffect(() => {
-    const fetchCurrentProfile = async () => {
-      if (!currentUser) {
-        setCurrentProfile(null);
-        return;
-      }
-
-      try {
-        const response = await fetch(
-          `${API_BASE}/api/users/${currentUser.uid}`
-        );
-        if (response.status === 404) {
-          setCurrentProfile(null);
-          return;
-        }
-        if (!response.ok) {
-          throw new Error(
-            `Profile request failed with status ${response.status}`
-          );
-        }
-
-        const data = (await response.json()) as UserProfile;
-        setCurrentProfile(data);
-      } catch (profileError) {
-        console.error(profileError);
-        setCurrentProfile(null);
-      }
-    };
-
-    fetchCurrentProfile();
-  }, [currentUser]);
 
   useEffect(() => {
     const resolveUserLocation = async () => {
@@ -549,18 +475,6 @@ export default function EventsScreen() {
       );
     } finally {
       setSavingEvent(false);
-    }
-  };
-
-  const openEvent = async (link?: string | null) => {
-    if (!link) {
-      return;
-    }
-
-    const canOpen = await Linking.canOpenURL(link);
-
-    if (canOpen) {
-      await Linking.openURL(link);
     }
   };
 
@@ -870,191 +784,15 @@ export default function EventsScreen() {
         </SafeAreaView>
       </Modal>
 
-      <Modal
-        animationType="slide"
-        onRequestClose={() => setSelectedEvent(null)}
+      <EventDetailsModal
+        event={selectedEvent}
         visible={selectedEvent !== null}
-      >
-        <SafeAreaView style={styles.modalSafe}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Event Details</Text>
-          </View>
-
-          {selectedEvent && (
-            <ScrollView contentContainerStyle={styles.detailContent}>
-              {selectedEvent.thumbnail ? (
-                <Image
-                  source={{ uri: selectedEvent.thumbnail }}
-                  style={styles.detailImage}
-                />
-              ) : (
-                <View style={styles.detailImagePlaceholder}>
-                  <Text style={styles.detailImagePlaceholderText}>Event</Text>
-                </View>
-              )}
-
-              <View style={styles.detailBody}>
-                <Text style={styles.detailTitle}>{selectedEvent.title}</Text>
-                {!!selectedEvent.date?.when && (
-                  <Text style={styles.detailWhen}>
-                    {selectedEvent.date.when}
-                  </Text>
-                )}
-                {!!selectedEvent.address?.length && (
-                  <Text style={styles.detailAddress}>
-                    {selectedEvent.address.join(", ")}
-                  </Text>
-                )}
-                {!!selectedEvent.tags?.length && (
-                  <View style={styles.detailTags}>
-                    {selectedEvent.tags.map((tag) => (
-                      <View
-                        key={tag}
-                        style={[
-                          styles.tagPill,
-                          { backgroundColor: colorForTag(tag) },
-                        ]}
-                      >
-                        <Text style={styles.tagPillText}>{tag}</Text>
-                      </View>
-                    ))}
-                  </View>
-                )}
-                <Text style={styles.detailDescription}>
-                  {selectedEvent.description ||
-                    "No description has been added for this event."}
-                </Text>
-              </View>
-
-              {/* Attendees section */}
-              <View style={styles.attendeesSection}>
-                <Text style={styles.attendeesSectionTitle}>
-                  {selectedEvent.attendees?.length ?? 0} Going
-                </Text>
-
-                {/* RSVP button */}
-                {(() => {
-                  const currentUid = currentUser?.uid;
-                  const isAttending = selectedEvent.attendees?.some(
-                    (a) => a.uid === currentUid
-                  );
-
-                  const handleRsvp = async () => {
-                    if (!currentUid || !selectedEvent.id) return;
-                    const displayName =
-                      currentProfile?.display_name ||
-                      currentUser?.displayName ||
-                      currentUser?.email?.split("@")[0] ||
-                      "Anonymous";
-
-                    if (isAttending) {
-                      const res = await fetch(
-                        `${API_BASE}/api/events/${selectedEvent.id}/rsvp/${currentUid}`,
-                        {
-                          method: "DELETE",
-                        }
-                      );
-                      if (res.ok) {
-                        const updated = (await res.json()) as Event;
-                        setSelectedEvent(updated);
-                        setEvents((prev) =>
-                          prev.map((e) => (e.id === updated.id ? updated : e))
-                        );
-                      }
-                    } else {
-                      const res = await fetch(
-                        `${API_BASE}/api/events/${selectedEvent.id}/rsvp`,
-                        {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({
-                            uid: currentUid,
-                            display_name: displayName,
-                            photo:
-                              currentProfile?.photo ?? currentUser?.photoURL,
-                          }),
-                        }
-                      );
-                      if (res.ok) {
-                        const updated = (await res.json()) as Event;
-                        setSelectedEvent(updated);
-                        setEvents((prev) =>
-                          prev.map((e) => (e.id === updated.id ? updated : e))
-                        );
-                      }
-                    }
-                  };
-
-                  return (
-                    <TouchableOpacity
-                      onPress={handleRsvp}
-                      style={[
-                        styles.rsvpButton,
-                        isAttending && styles.rsvpButtonActive,
-                      ]}
-                      activeOpacity={0.85}
-                    >
-                      <Text
-                        style={[
-                          styles.rsvpButtonText,
-                          isAttending && styles.rsvpButtonTextActive,
-                        ]}
-                      >
-                        {isAttending ? "✓ I'm going" : "RSVP"}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })()}
-
-                {/* Attendee list */}
-                {!!selectedEvent.attendees?.length && (
-                  <View style={styles.attendeeList}>
-                    {selectedEvent.attendees.map((a) => (
-                      <View key={a.uid} style={styles.attendeeRow}>
-                        {a.photo ? (
-                          <Image
-                            source={{ uri: a.photo }}
-                            style={styles.attendeeAvatar}
-                          />
-                        ) : (
-                          <View style={styles.attendeeAvatarPlaceholder}>
-                            <Text style={styles.attendeeAvatarText}>
-                              {a.display_name?.[0] ?? "?"}
-                            </Text>
-                          </View>
-                        )}
-                        <Text style={styles.attendeeName}>
-                          {a.display_name ?? "Anonymous"}
-                        </Text>
-                      </View>
-                    ))}
-                  </View>
-                )}
-              </View>
-
-              {!!selectedEvent.link && (
-                <TouchableOpacity
-                  activeOpacity={0.85}
-                  onPress={() => openEvent(selectedEvent.link)}
-                  style={styles.detailLinkButton}
-                >
-                  <Text style={styles.detailLinkButtonText}>
-                    Open event link
-                  </Text>
-                </TouchableOpacity>
-              )}
-
-              <TouchableOpacity
-                activeOpacity={0.85}
-                onPress={() => setSelectedEvent(null)}
-                style={styles.detailCloseButton}
-              >
-                <Text style={styles.detailCloseButtonText}>Close</Text>
-              </TouchableOpacity>
-            </ScrollView>
-          )}
-        </SafeAreaView>
-      </Modal>
+        onClose={() => setSelectedEvent(null)}
+        onEventUpdate={(updated) => {
+          setSelectedEvent(updated);
+          setEvents((prev) => prev.map((event) => (event.id === updated.id ? updated : event)));
+        }}
+      />
 
       <View style={styles.chips}>
         {filters.map((item) => (

@@ -9,9 +9,10 @@ import {
   View,
 } from "react-native";
 import * as Location from "expo-location";
-import { router } from "expo-router";
 import MapView, { Callout, Marker, Region } from "react-native-maps";
 
+import { EventDetailsModal } from "@/components/ui/event-details-modal";
+import type { Event } from "@/types/event";
 import { API_BASE } from "../../constants/api";
 import { flatButton, palette } from "../../constants/palette";
 
@@ -23,22 +24,6 @@ const FALLBACK_REGION = {
   longitude: -121.7405,
   latitudeDelta: 0.05,
   longitudeDelta: 0.05,
-};
-
-type Event = {
-  id?: string;
-  title: string;
-  date?: {
-    when?: string | null;
-  } | null;
-  address?: string[];
-  description?: string | null;
-  thumbnail?: string | null;
-  tags?: string[];
-  location?: {
-    type: "Point";
-    coordinates: number[];
-  } | null;
 };
 
 const withTimeout = async <T,>(
@@ -119,23 +104,13 @@ const eventCoordinate = (event: Event) => {
   return { latitude, longitude };
 };
 
-const openEventDetails = (eventId?: string) => {
-  if (!eventId) {
-    return;
-  }
-
-  router.push({
-    pathname: "/events/[id]",
-    params: { id: eventId },
-  });
-};
-
 export default function MapScreen() {
   const [initialRegion, setInitialRegion] = useState<Region | null>(null);
   const [events, setEvents] = useState<Event[]>([]);
   const [eventsLoading, setEventsLoading] = useState(false);
   const [eventsError, setEventsError] = useState<string | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
+  const [detailsEvent, setDetailsEvent] = useState<Event | null>(null);
   const nearbyEventLabel = eventsError
     ? eventsError
     : eventsLoading
@@ -270,7 +245,7 @@ export default function MapScreen() {
               </View>
               {Platform.OS !== "android" && (
                 <Callout
-                  onPress={() => openEventDetails(event.id)}
+                  onPress={() => setDetailsEvent(event)}
                   tooltip={false}
                   style={styles.calloutWrapper}
                 >
@@ -391,13 +366,25 @@ export default function MapScreen() {
           <TouchableOpacity
             activeOpacity={0.85}
             disabled={!selectedEvent.id}
-            onPress={() => openEventDetails(selectedEvent.id)}
+            onPress={() => setDetailsEvent(selectedEvent)}
             style={styles.previewDetailsButton}
           >
             <Text style={styles.previewDetailsText}>View details</Text>
           </TouchableOpacity>
         </View>
       )}
+      <EventDetailsModal
+        event={detailsEvent}
+        visible={detailsEvent !== null}
+        onClose={() => setDetailsEvent(null)}
+        onEventUpdate={(updated) => {
+          setDetailsEvent(updated);
+          setSelectedEvent((current) => (current?.id === updated.id ? updated : current));
+          setEvents((currentEvents) =>
+            currentEvents.map((event) => (event.id === updated.id ? updated : event))
+          );
+        }}
+      />
     </View>
   );
 }

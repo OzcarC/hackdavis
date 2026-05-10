@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import React from 'react';
+import React, { useState } from 'react';
 import {
   ActivityIndicator,
   ScrollView,
@@ -11,12 +11,13 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { EventCard } from '@/components/event-card';
+import { EventDetailsModal } from '@/components/ui/event-details-modal';
 import { fallbackEvents } from '@/constants/fallback-events';
 import { filterEventsByInterests, type Interest } from '@/constants/interests';
 import { flatButton, palette } from '@/constants/palette';
 import { useEvents } from '@/hooks/use-events';
+import type { Event } from '@/types/event';
 
-// TODO: read from user profile once onboarding exists
 const userInterests: Interest[] = ['Chill', 'Gaming', 'Food'];
 
 const FOR_YOU_LIMIT = 5;
@@ -25,6 +26,7 @@ const HAPPENING_LIMIT = 6;
 export default function HomeScreen() {
   const router = useRouter();
   const { events, loading, location } = useEvents();
+  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
 
   const displayEvents = events.length > 0 ? events : fallbackEvents;
   const forYouAll = filterEventsByInterests(displayEvents, userInterests);
@@ -33,13 +35,8 @@ export default function HomeScreen() {
   const hasMoreHappening = displayEvents.length > HAPPENING_LIMIT;
 
   const goToEvents = () => router.push('/(tabs)/events');
-  const openEvent = (event: { id?: string }) => {
-    if (event.id) {
-      router.push({ pathname: '/events/[id]', params: { id: event.id } });
-    } else {
-      goToEvents();
-    }
-  };
+  const openEventModal = (event: Event) => setSelectedEvent(event);
+  const closeEventModal = () => setSelectedEvent(null);
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -77,7 +74,7 @@ export default function HomeScreen() {
                         <EventCard
                           key={event.id ?? event.link ?? `for-you-${index}`}
                           event={event}
-                          onPress={openEvent}
+                          onPress={openEventModal}
                         />
                       ))}
 
@@ -97,32 +94,32 @@ export default function HomeScreen() {
               <View style={styles.sectionRow}>
                 <View style={[styles.sectionStripe, { backgroundColor: palette.peach }]} />
                 <View style={styles.sectionBody}>
-                  <View style={styles.areaContainer}>
-                    <View style={styles.sectionHeader}>
-                      <Text style={styles.sectionTitle}>Happening in {location.split(',')[0]}</Text>
-                      <Text style={styles.sectionSubtitle}>All events near you</Text>
-                    </View>
+                  <View style={styles.sectionHeader}>
+                    <Text style={styles.sectionTitle}>
+                      Happening in {location.split(',')[0]}
+                    </Text>
+                    <Text style={styles.sectionSubtitle}>All events near you</Text>
+                  </View>
 
-                    <View style={styles.cardStack}>
-                      {happeningTop.map((event, index) => (
-                        <EventCard
-                          key={event.id ?? event.link ?? `area-${index}`}
-                          event={event}
-                          onPress={openEvent}
-                        />
-                      ))}
+                  <View style={styles.cardStack}>
+                    {happeningTop.map((event, index) => (
+                      <EventCard
+                        key={event.id ?? event.link ?? `area-${index}`}
+                        event={event}
+                        onPress={openEventModal}
+                      />
+                    ))}
 
-                      {hasMoreHappening && (
-                        <TouchableOpacity
-                          activeOpacity={0.85}
-                          onPress={goToEvents}
-                          style={styles.viewAllButton}>
-                          <Text style={styles.viewAllButtonText}>
-                            View all {displayEvents.length} events
-                          </Text>
-                        </TouchableOpacity>
-                      )}
-                    </View>
+                    {hasMoreHappening && (
+                      <TouchableOpacity
+                        activeOpacity={0.85}
+                        onPress={goToEvents}
+                        style={styles.viewAllButton}>
+                        <Text style={styles.viewAllButtonText}>
+                          View all {displayEvents.length} events
+                        </Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
                 </View>
               </View>
@@ -130,6 +127,13 @@ export default function HomeScreen() {
           </>
         )}
       </ScrollView>
+
+      <EventDetailsModal
+        event={selectedEvent}
+        visible={!!selectedEvent}
+        onClose={closeEventModal}
+        onEventUpdate={(updated) => setSelectedEvent(updated)}
+      />
     </SafeAreaView>
   );
 }
@@ -160,22 +164,6 @@ const styles = StyleSheet.create({
   },
   loader: {
     marginTop: 40,
-  },
-  messageBox: {
-    margin: 16,
-    paddingVertical: 28,
-  },
-  messageTitle: {
-    color: palette.textPrimary,
-    fontSize: 16,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-  messageText: {
-    color: palette.textMuted,
-    fontSize: 14,
-    marginTop: 6,
-    textAlign: 'center',
   },
   section: {
     paddingHorizontal: 16,
@@ -239,12 +227,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     letterSpacing: 0.3,
-  },
-  areaContainer: {
-    borderColor: palette.border,
-    borderRadius: 18,
-    borderWidth: 1,
-    padding: 14,
   },
   emptyCard: {
     alignItems: 'center',

@@ -56,7 +56,6 @@ export default function EventDetailsScreen() {
   const [cancelling, setCancelling] = useState(false);
   const [cancelReasonModalOpen, setCancelReasonModalOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
-  const [rsvpCooldown, setRsvpCooldown] = useState(0);
 
   const user = auth.currentUser;
 
@@ -186,16 +185,6 @@ export default function EventDetailsScreen() {
 
                 const updated = (await response.json()) as Event;
                 setEvent(updated);
-                setRsvpCooldown(10);
-                const interval = setInterval(() => {
-                  setRsvpCooldown((prev) => {
-                    if (prev <= 1) {
-                      clearInterval(interval);
-                      return 0;
-                    }
-                    return prev - 1;
-                  });
-                }, 1000);
               } catch (error) {
                 console.error(error);
                 Alert.alert("RSVP failed", "Please try again in a moment.");

@@ -1,4 +1,5 @@
 import * as ImagePicker from 'expo-image-picker';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -16,8 +17,10 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 
+import { EventDetailsModal } from '@/components/ui/event-details-modal';
 import { API_BASE } from '@/constants/api';
-import { palette } from '@/constants/palette';
+import { flatButton, palette } from '@/constants/palette';
+import type { Event } from '@/types/event';
 import { auth } from '../../firebase';
 
 type UserProfile = {
@@ -29,16 +32,14 @@ type UserProfile = {
   photo?: string | null;
 };
 
-type Event = {
-  id?: string;
-  title: string;
-  date?: { start_date?: string | null; when?: string | null } | null;
-  address?: string[];
-  link?: string | null;
-  thumbnail?: string | null;
-  description?: string | null;
-  tags?: string[];
-  author?: string | null;
+const isPastEvent = (event: Event): boolean => {
+  if (!event.date?.start_date) return false;
+  try {
+    const eventDate = new Date(event.date.start_date);
+    return eventDate < new Date();
+  } catch {
+    return false;
+  }
 };
 
 export default function ProfileScreen() {
@@ -51,6 +52,8 @@ export default function ProfileScreen() {
   const [editOpen, setEditOpen] = useState(false);
   const [editName, setEditName] = useState('');
   const [editBio, setEditBio] = useState('');
+  const [editPhoto, setEditPhoto] = useState<string | null>(null);
+  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
 
   const user = auth.currentUser;
 
@@ -108,21 +111,26 @@ export default function ProfileScreen() {
     }, [fetchProfileEvents])
   );
 
-  const pickProfilePhoto = async () => {
-    if (!user) { Alert.alert('Not signed in', 'Log in before adding a profile photo.'); return; }
+  const chooseProfilePhoto = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== ImagePicker.PermissionStatus.GRANTED) {
       Alert.alert('Photo access needed', 'Allow photo access to choose a profile picture.');
-      return;
+      return null;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
       allowsEditing: true, aspect: [1, 1], base64: true, mediaTypes: ['images'], quality: 0.45,
     });
-    if (result.canceled) return;
+    if (result.canceled) return null;
     const asset = result.assets[0];
-    const photo = asset.base64
+    return asset.base64
       ? `data:${asset.mimeType ?? 'image/jpeg'};base64,${asset.base64}`
       : asset.uri;
+  };
+
+  const pickProfilePhoto = async () => {
+    if (!user) { Alert.alert('Not signed in', 'Log in before adding a profile photo.'); return; }
+    const photo = await chooseProfilePhoto();
+    if (!photo) return;
     setSaving(true);
     try {
       const response = await fetch(`${API_BASE}/api/users/${user.uid}`, {
@@ -141,6 +149,18 @@ export default function ProfileScreen() {
     }
   };
 
+  const pickEditPhoto = async () => {
+    const photo = await chooseProfilePhoto();
+    if (photo) setEditPhoto(photo);
+  };
+
+  const openEditProfile = () => {
+    setEditName(profile?.display_name ?? '');
+    setEditBio(profile?.bio ?? '');
+    setEditPhoto(profile?.photo ?? null);
+    setEditOpen(true);
+  };
+
   const saveProfileEdits = async () => {
     if (!user) return;
     setSaving(true);
@@ -153,7 +173,7 @@ export default function ProfileScreen() {
           email: user.email,
           display_name: editName.trim() || null,
           bio: editBio.trim() || null,
-          photo: profile?.photo,
+          photo: editPhoto,
         }),
       });
       if (!response.ok) throw new Error(`Status ${response.status}`);
@@ -169,11 +189,41 @@ export default function ProfileScreen() {
   };
 
   const displayName = profile?.display_name || user?.displayName || user?.email?.split('@')[0] || 'You';
+  const editDisplayName = editName.trim() || displayName;
+  const editInitials = editDisplayName.charAt(0).toUpperCase();
   const initials = displayName.charAt(0).toUpperCase();
+  const upcomingEvents = attendingEvents.filter((event) => !isPastEvent(event));
+  const attendedEvents = attendingEvents.filter((event) => isPastEvent(event));
   const totalEvents = hostedEvents.length + attendingEvents.length;
 
+  const updateProfileEvent = (updated: Event) => {
+    setSelectedEvent(updated);
+    setHostedEvents((currentEvents) =>
+      currentEvents.map((event) => (event.id === updated.id ? updated : event))
+    );
+    setAttendingEvents((currentEvents) => {
+      const isAttending = updated.attendees?.some((attendee) => attendee.uid === user?.uid);
+      const isHostedByUser = updated.author === user?.uid;
+      const alreadyListed = currentEvents.some((event) => event.id === updated.id);
+
+      if (!isAttending || isHostedByUser) {
+        return currentEvents.filter((event) => event.id !== updated.id);
+      }
+
+      if (alreadyListed) {
+        return currentEvents.map((event) => (event.id === updated.id ? updated : event));
+      }
+
+      return [updated, ...currentEvents];
+    });
+  };
+
   const renderEventCard = (item: Event) => (
-    <View style={styles.eventCard}>
+    <TouchableOpacity
+      activeOpacity={0.85}
+      onPress={() => setSelectedEvent(item)}
+      style={styles.eventCard}
+    >
       {item.thumbnail ? (
         <Image source={{ uri: item.thumbnail }} style={styles.eventThumb} />
       ) : (
@@ -199,7 +249,7 @@ export default function ProfileScreen() {
           </View>
         )}
       </View>
-    </View>
+    </TouchableOpacity>
   );
 
   if (loading) {
@@ -216,17 +266,67 @@ export default function ProfileScreen() {
       <Modal animationType="slide" onRequestClose={() => setEditOpen(false)} visible={editOpen} presentationStyle="pageSheet">
         <SafeAreaView style={styles.modalSafe}>
           <View style={styles.modalHeader}>
-            <TouchableOpacity onPress={() => setEditOpen(false)} style={styles.modalCancel}>
-              <Text style={styles.modalCancelText}>Cancel</Text>
+            <TouchableOpacity
+              accessibilityLabel="Close edit profile"
+              activeOpacity={0.8}
+              onPress={() => setEditOpen(false)}
+              style={styles.modalIconButton}
+            >
+              <MaterialIcons color={palette.textPrimary} name="close" size={22} />
             </TouchableOpacity>
-            <Text style={styles.modalTitle}>Edit Profile</Text>
-            <TouchableOpacity onPress={saveProfileEdits} disabled={saving} style={styles.modalSaveBtn}>
-              <Text style={[styles.modalSaveText, saving && { opacity: 0.5 }]}>
-                {saving ? 'Saving…' : 'Save'}
-              </Text>
+            <View style={styles.modalTitleGroup}>
+              <Text style={styles.modalTitle}>Edit Profile</Text>
+              <Text style={styles.modalSubtitle}>Update how people see you at events.</Text>
+            </View>
+            <TouchableOpacity
+              accessibilityLabel="Save profile"
+              activeOpacity={0.85}
+              disabled={saving}
+              onPress={saveProfileEdits}
+              style={[styles.modalSaveButton, saving && styles.modalSaveButtonDisabled]}
+            >
+              {saving ? (
+                <ActivityIndicator color="#FFFFFF" size="small" />
+              ) : (
+                <MaterialIcons color="#FFFFFF" name="check" size={22} />
+              )}
             </TouchableOpacity>
           </View>
+
           <ScrollView contentContainerStyle={styles.form}>
+            <View style={styles.editHero}>
+              <TouchableOpacity
+                activeOpacity={0.85}
+                disabled={saving}
+                onPress={pickEditPhoto}
+                style={styles.editAvatarButton}
+              >
+                {editPhoto ? (
+                  <Image source={{ uri: editPhoto }} style={styles.editAvatar} />
+                ) : (
+                  <View style={styles.editAvatarPlaceholder}>
+                    <Text style={styles.editAvatarInitials}>{editInitials}</Text>
+                  </View>
+                )}
+                <View style={styles.editCameraBadge}>
+                  <MaterialIcons color="#FFFFFF" name="photo-camera" size={18} />
+                </View>
+              </TouchableOpacity>
+              <Text style={styles.editHeroName} numberOfLines={1}>{editDisplayName}</Text>
+              <Text style={styles.editHeroEmail} numberOfLines={1}>{user?.email}</Text>
+              <TouchableOpacity
+                activeOpacity={0.85}
+                disabled={saving}
+                onPress={pickEditPhoto}
+                style={styles.photoActionButton}
+              >
+                <MaterialIcons color={palette.coral} name="add-a-photo" size={18} />
+                <Text style={styles.photoActionText}>
+                  {editPhoto ? 'Change photo' : 'Add photo'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
             <View style={styles.fieldGroup}>
               <Text style={styles.label}>Display name</Text>
               <TextInput
@@ -238,16 +338,38 @@ export default function ProfileScreen() {
               />
             </View>
             <View style={styles.fieldGroup}>
-              <Text style={styles.label}>Bio</Text>
+              <View style={styles.labelRow}>
+                <Text style={styles.label}>Bio</Text>
+                <Text style={styles.helperText}>{editBio.length}/160</Text>
+              </View>
               <TextInput
+                maxLength={160}
                 multiline
                 onChangeText={setEditBio}
-                placeholder="Tell people a bit about yourself"
+                placeholder="Share what kinds of events you like."
                 placeholderTextColor={palette.textSubtle}
                 style={[styles.input, styles.textArea]}
                 textAlignVertical="top"
                 value={editBio}
               />
+            </View>
+
+            <View style={styles.formActions}>
+              <TouchableOpacity
+                activeOpacity={0.85}
+                disabled={saving}
+                onPress={saveProfileEdits}
+                style={[styles.saveProfileButton, saving && styles.saveProfileButtonDisabled]}
+              >
+                {saving ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <>
+                    <MaterialIcons color="#FFFFFF" name="check" size={20} />
+                    <Text style={styles.saveProfileButtonText}>Save changes</Text>
+                  </>
+                )}
+              </TouchableOpacity>
             </View>
           </ScrollView>
         </SafeAreaView>
@@ -271,11 +393,12 @@ export default function ProfileScreen() {
                     </View>
                   )}
                   <View style={styles.cameraBadge}>
-                    <Text style={styles.cameraBadgeText}>+</Text>
+                    <MaterialIcons color={palette.coral} name="photo-camera" size={16} />
                   </View>
                 </View>
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => setEditOpen(true)} style={styles.editButton} activeOpacity={0.85}>
+              <TouchableOpacity onPress={openEditProfile} style={styles.editButton} activeOpacity={0.85}>
+                <MaterialIcons color={palette.textPrimary} name="edit" size={16} />
                 <Text style={styles.editButtonText}>Edit Profile</Text>
               </TouchableOpacity>
             </View>
@@ -296,9 +419,15 @@ export default function ProfileScreen() {
                 <Text style={styles.statLabel}>Hosting</Text>
               </View>
               <View style={styles.statItem}>
-                <Text style={styles.statNumber}>{attendingEvents.length}</Text>
+                <Text style={styles.statNumber}>{upcomingEvents.length}</Text>
                 <Text style={styles.statLabel}>Attending</Text>
               </View>
+              {attendedEvents.length > 0 && (
+                <View style={styles.statItem}>
+                  <Text style={styles.statNumber}>{attendedEvents.length}</Text>
+                  <Text style={styles.statLabel}>Attended</Text>
+                </View>
+              )}
             </View>
 
             {/* Divider + section title */}
@@ -328,8 +457,8 @@ export default function ProfileScreen() {
               totalEvents > 0 ? (
                 <ActivityIndicator color="#6366F1" style={{ marginTop: 16 }} />
               ) : null
-            ) : attendingEvents.length > 0 ? (
-              attendingEvents.map((event, index) => (
+            ) : upcomingEvents.length > 0 ? (
+              upcomingEvents.map((event, index) => (
                 <View key={event.id ?? `attending-${index}`}>
                   {renderEventCard(event)}
                 </View>
@@ -341,8 +470,28 @@ export default function ProfileScreen() {
                 <Text style={styles.emptyText}>Events you RSVP to will show up here.</Text>
               </View>
             )}
+
+            {!eventsLoading && attendedEvents.length > 0 && (
+              <>
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>Attended</Text>
+                </View>
+                {attendedEvents.map((event, index) => (
+                  <View key={event.id ?? `attended-${index}`}>
+                    {renderEventCard(event)}
+                  </View>
+                ))}
+              </>
+            )}
           </>
         }
+      />
+
+      <EventDetailsModal
+        event={selectedEvent}
+        visible={selectedEvent !== null}
+        onClose={() => setSelectedEvent(null)}
+        onEventUpdate={updateProfileEvent}
       />
     </SafeAreaView>
   );
@@ -398,12 +547,14 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
-  cameraBadgeText: { fontSize: 16, color: palette.coral, fontWeight: '700', lineHeight: 18 },
 
   editButton: {
+    alignItems: 'center',
     borderWidth: 1.5,
     borderColor: palette.border,
     borderRadius: 20,
+    flexDirection: 'row',
+    gap: 6,
     paddingHorizontal: 16,
     paddingVertical: 7,
     backgroundColor: palette.card,
@@ -481,21 +632,106 @@ const styles = StyleSheet.create({
   modalSafe: { backgroundColor: palette.bg, flex: 1 },
   modalHeader: {
     alignItems: 'center',
-    borderBottomColor: palette.border,
-    borderBottomWidth: 1,
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    gap: 12,
     paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingBottom: 14,
+    paddingTop: 30,
   },
-  modalTitle: { color: palette.textPrimary, fontSize: 16, fontWeight: '700' },
-  modalCancel: { minWidth: 60 },
-  modalCancelText: { color: palette.textMuted, fontSize: 15 },
-  modalSaveBtn: { minWidth: 60, alignItems: 'flex-end' },
-  modalSaveText: { color: palette.coral, fontSize: 15, fontWeight: '700' },
-  form: { gap: 16, padding: 16 },
+  modalIconButton: {
+    alignItems: 'center',
+    backgroundColor: palette.card,
+    borderColor: palette.border,
+    borderRadius: 20,
+    borderWidth: 1,
+    height: 40,
+    justifyContent: 'center',
+    width: 40,
+  },
+  modalTitleGroup: { flex: 1 },
+  modalTitle: { color: palette.textPrimary, fontSize: 20, fontWeight: '800' },
+  modalSubtitle: { color: palette.textMuted, fontSize: 12, marginTop: 2 },
+  modalSaveButton: {
+    alignItems: 'center',
+    backgroundColor: palette.coral,
+    borderRadius: 20,
+    height: 40,
+    justifyContent: 'center',
+    width: 40,
+    ...flatButton('coral'),
+  },
+  modalSaveButtonDisabled: { opacity: 0.65 },
+  form: { gap: 16, paddingBottom: 28, paddingHorizontal: 16 },
+  editHero: {
+    paddingTop: 20,
+    alignItems: 'center',
+    backgroundColor: palette.card,
+    borderColor: palette.border,
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 18,
+  },
+  editAvatarButton: { marginBottom: 12, position: 'relative' },
+  editAvatar: {
+    backgroundColor: palette.border,
+    borderColor: palette.bg,
+    borderRadius: 48,
+    borderWidth: 3,
+    height: 96,
+    width: 96,
+  },
+  editAvatarPlaceholder: {
+    alignItems: 'center',
+    backgroundColor: palette.coral,
+    borderColor: palette.bg,
+    borderRadius: 48,
+    borderWidth: 3,
+    height: 96,
+    justifyContent: 'center',
+    width: 96,
+  },
+  editAvatarInitials: { color: '#FFFFFF', fontSize: 36, fontWeight: '800' },
+  editCameraBadge: {
+    alignItems: 'center',
+    backgroundColor: palette.coral,
+    borderColor: palette.card,
+    borderRadius: 17,
+    borderWidth: 3,
+    bottom: 0,
+    height: 34,
+    justifyContent: 'center',
+    position: 'absolute',
+    right: 0,
+    width: 34,
+  },
+  editHeroName: {
+    color: palette.textPrimary,
+    fontSize: 20,
+    fontWeight: '800',
+    maxWidth: '100%',
+  },
+  editHeroEmail: {
+    color: palette.textMuted,
+    fontSize: 13,
+    marginTop: 3,
+    maxWidth: '100%',
+  },
+  photoActionButton: {
+    alignItems: 'center',
+    borderColor: palette.border,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    flexDirection: 'row',
+    gap: 7,
+    marginTop: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  photoActionText: { color: palette.coral, fontSize: 13, fontWeight: '800' },
   fieldGroup: { gap: 6 },
+  labelRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
   label: { color: palette.textPrimary, fontSize: 13, fontWeight: '600' },
+  helperText: { color: palette.textSubtle, fontSize: 12, fontWeight: '600' },
   input: {
     backgroundColor: palette.card,
     borderColor: palette.border,
@@ -508,4 +744,17 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   textArea: { minHeight: 110 },
+  formActions: { paddingTop: 4 },
+  saveProfileButton: {
+    alignItems: 'center',
+    backgroundColor: palette.coral,
+    borderRadius: 14,
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'center',
+    minHeight: 52,
+    ...flatButton('coral'),
+  },
+  saveProfileButtonDisabled: { opacity: 0.65 },
+  saveProfileButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '800' },
 });

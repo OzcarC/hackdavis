@@ -58,9 +58,30 @@ async def upsert_user_profile(
     if uid != profile.uid:
         raise HTTPException(status_code=400, detail="Profile uid does not match route uid.")
 
+    update_data = profile.model_dump(exclude_unset=True)
+    existing = await db.user_profiles.find_one({"uid": uid})
+    if (
+        existing is not None
+        and existing.get("onboarding_completed") is True
+        and update_data.get("onboarding_completed") is False
+        and not any(
+            field in update_data
+            for field in (
+                "personality_type",
+                "interests",
+                "preferred_tags",
+                "availability",
+                "home_location",
+                "free_time_activities",
+                "onboarding_answers",
+            )
+        )
+    ):
+        update_data["onboarding_completed"] = True
+
     saved = await db.user_profiles.find_one_and_update(
         {"uid": uid},
-        {"$set": profile.model_dump()},
+        {"$set": update_data},
         upsert=True,
         return_document=ReturnDocument.AFTER,
     )
