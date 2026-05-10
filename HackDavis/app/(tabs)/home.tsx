@@ -16,19 +16,7 @@ import { fallbackEvents } from '@/constants/fallback-events';
 import { filterEventsByInterests, type Interest } from '@/constants/interests';
 import { flatButton, palette } from '@/constants/palette';
 import { useEvents } from '@/hooks/use-events';
-
-type Event = {
-  id?: string;
-  title: string;
-  date?: { start_date?: string | null; when?: string | null } | null;
-  address?: string[];
-  link?: string | null;
-  thumbnail?: string | null;
-  description?: string | null;
-  tags?: string[];
-  author?: string | null;
-  attendees?: { uid: string; display_name?: string | null; photo?: string | null }[];
-};
+import type { Event } from '@/types/event';
 
 const userInterests: Interest[] = ['Chill', 'Gaming', 'Food'];
 
@@ -83,12 +71,11 @@ export default function HomeScreen() {
                   ) : (
                     <View style={styles.cardStack}>
                       {forYouTop.map((event, index) => (
-                        <TouchableOpacity
+                        <EventCard
                           key={event.id ?? event.link ?? `for-you-${index}`}
-                          onPress={() => openEventModal(event as Event)}
-                          activeOpacity={0.85}>
-                          <EventCard event={event} onPress={() => {}} />
-                        </TouchableOpacity>
+                          event={event}
+                          onPress={openEventModal}
+                        />
                       ))}
 
                       <TouchableOpacity
@@ -116,12 +103,11 @@ export default function HomeScreen() {
 
                   <View style={styles.cardStack}>
                     {happeningTop.map((event, index) => (
-                      <TouchableOpacity
+                      <EventCard
                         key={event.id ?? event.link ?? `area-${index}`}
-                        onPress={() => openEventModal(event as Event)}
-                        activeOpacity={0.85}>
-                        <EventCard event={event} onPress={() => {}} />
-                      </TouchableOpacity>
+                        event={event}
+                        onPress={openEventModal}
+                      />
                     ))}
 
                     {hasMoreHappening && (

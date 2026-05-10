@@ -17,8 +17,10 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 
+import { EventDetailsModal } from '@/components/ui/event-details-modal';
 import { API_BASE } from '@/constants/api';
 import { flatButton, palette } from '@/constants/palette';
+import type { Event } from '@/types/event';
 import { auth } from '../../firebase';
 
 type UserProfile = {
@@ -28,18 +30,6 @@ type UserProfile = {
   display_name?: string | null;
   bio?: string | null;
   photo?: string | null;
-};
-
-type Event = {
-  id?: string;
-  title: string;
-  date?: { start_date?: string | null; when?: string | null } | null;
-  address?: string[];
-  link?: string | null;
-  thumbnail?: string | null;
-  description?: string | null;
-  tags?: string[];
-  author?: string | null;
 };
 
 const isPastEvent = (event: Event): boolean => {
@@ -63,6 +53,7 @@ export default function ProfileScreen() {
   const [editName, setEditName] = useState('');
   const [editBio, setEditBio] = useState('');
   const [editPhoto, setEditPhoto] = useState<string | null>(null);
+  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
 
   const user = auth.currentUser;
 
@@ -205,8 +196,34 @@ export default function ProfileScreen() {
   const attendedEvents = attendingEvents.filter((event) => isPastEvent(event));
   const totalEvents = hostedEvents.length + attendingEvents.length;
 
+  const updateProfileEvent = (updated: Event) => {
+    setSelectedEvent(updated);
+    setHostedEvents((currentEvents) =>
+      currentEvents.map((event) => (event.id === updated.id ? updated : event))
+    );
+    setAttendingEvents((currentEvents) => {
+      const isAttending = updated.attendees?.some((attendee) => attendee.uid === user?.uid);
+      const isHostedByUser = updated.author === user?.uid;
+      const alreadyListed = currentEvents.some((event) => event.id === updated.id);
+
+      if (!isAttending || isHostedByUser) {
+        return currentEvents.filter((event) => event.id !== updated.id);
+      }
+
+      if (alreadyListed) {
+        return currentEvents.map((event) => (event.id === updated.id ? updated : event));
+      }
+
+      return [updated, ...currentEvents];
+    });
+  };
+
   const renderEventCard = (item: Event) => (
-    <View style={styles.eventCard}>
+    <TouchableOpacity
+      activeOpacity={0.85}
+      onPress={() => setSelectedEvent(item)}
+      style={styles.eventCard}
+    >
       {item.thumbnail ? (
         <Image source={{ uri: item.thumbnail }} style={styles.eventThumb} />
       ) : (
@@ -232,7 +249,7 @@ export default function ProfileScreen() {
           </View>
         )}
       </View>
-    </View>
+    </TouchableOpacity>
   );
 
   if (loading) {
@@ -468,6 +485,13 @@ export default function ProfileScreen() {
             )}
           </>
         }
+      />
+
+      <EventDetailsModal
+        event={selectedEvent}
+        visible={selectedEvent !== null}
+        onClose={() => setSelectedEvent(null)}
+        onEventUpdate={updateProfileEvent}
       />
     </SafeAreaView>
   );

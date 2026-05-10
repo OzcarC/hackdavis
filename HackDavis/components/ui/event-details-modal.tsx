@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   Image,
   Linking,
   Modal,
@@ -13,26 +14,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { API_BASE } from '@/constants/api';
 import { colorForTag, flatButton, flatOutline, palette } from '@/constants/palette';
+import type { Event } from '@/types/event';
 import { auth } from '../../firebase';
-
-type Attendee = {
-  uid: string;
-  display_name?: string | null;
-  photo?: string | null;
-};
-
-type Event = {
-  id?: string;
-  title: string;
-  date?: { start_date?: string | null; when?: string | null } | null;
-  address?: string[];
-  link?: string | null;
-  thumbnail?: string | null;
-  description?: string | null;
-  tags?: string[];
-  author?: string | null;
-  attendees?: Attendee[];
-};
 
 type UserProfile = {
   uid: string;
@@ -51,17 +34,17 @@ type Props = {
 export function EventDetailsModal({ event, visible, onClose, onEventUpdate }: Props) {
   const [currentEvent, setCurrentEvent] = useState<Event | null>(event);
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [rsvpSaving, setRsvpSaving] = useState(false);
 
   const user = auth.currentUser;
   const currentUid = user?.uid;
   const isAttending = !!currentEvent?.attendees?.some((a) => a.uid === currentUid);
 
-  // Sync incoming prop -> local copy when a new event is opened
   useEffect(() => {
     setCurrentEvent(event);
-  }, [event?.id]);
+    setRsvpSaving(false);
+  }, [event]);
 
-  // Load profile for RSVP display name / photo
   useEffect(() => {
     if (!user || !visible) return;
     let cancelled = false;
@@ -81,37 +64,42 @@ export function EventDetailsModal({ event, visible, onClose, onEventUpdate }: Pr
   const handleRsvp = async () => {
     if (!currentUid || !currentEvent?.id) return;
 
+    setRsvpSaving(true);
     const displayName =
       profile?.display_name ||
       user?.displayName ||
       user?.email?.split('@')[0] ||
       'Anonymous';
 
-    if (isAttending) {
-      const res = await fetch(
-        `${API_BASE}/api/events/${currentEvent.id}/rsvp/${currentUid}`,
-        { method: 'DELETE' }
-      );
-      if (res.ok) {
-        const updated = (await res.json()) as Event;
-        setCurrentEvent(updated);
-        onEventUpdate?.(updated);
+    try {
+      if (isAttending) {
+        const res = await fetch(
+          `${API_BASE}/api/events/${currentEvent.id}/rsvp/${currentUid}`,
+          { method: 'DELETE' }
+        );
+        if (res.ok) {
+          const updated = (await res.json()) as Event;
+          setCurrentEvent(updated);
+          onEventUpdate?.(updated);
+        }
+      } else {
+        const res = await fetch(`${API_BASE}/api/events/${currentEvent.id}/rsvp`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            uid: currentUid,
+            display_name: displayName,
+            photo: profile?.photo ?? user?.photoURL,
+          }),
+        });
+        if (res.ok) {
+          const updated = (await res.json()) as Event;
+          setCurrentEvent(updated);
+          onEventUpdate?.(updated);
+        }
       }
-    } else {
-      const res = await fetch(`${API_BASE}/api/events/${currentEvent.id}/rsvp`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          uid: currentUid,
-          display_name: displayName,
-          photo: profile?.photo ?? user?.photoURL,
-        }),
-      });
-      if (res.ok) {
-        const updated = (await res.json()) as Event;
-        setCurrentEvent(updated);
-        onEventUpdate?.(updated);
-      }
+    } finally {
+      setRsvpSaving(false);
     }
   };
 
@@ -147,10 +135,10 @@ export function EventDetailsModal({ event, visible, onClose, onEventUpdate }: Pr
             )}
 
             <View style={styles.detailBody}>
-              <Text style={styles.detailTitle}>{currentEvent.title}</Text>
               {!!currentEvent.date?.when && (
                 <Text style={styles.detailWhen}>{currentEvent.date.when}</Text>
               )}
+              <Text style={styles.detailTitle}>{currentEvent.title}</Text>
               {!!currentEvent.address?.length && (
                 <Text style={styles.detailAddress}>
                   {currentEvent.address.join(', ')}
@@ -174,28 +162,38 @@ export function EventDetailsModal({ event, visible, onClose, onEventUpdate }: Pr
               </Text>
             </View>
 
-            {/* Attendees section */}
             <View style={styles.attendeesSection}>
-              <Text style={styles.attendeesSectionTitle}>
-                {currentEvent.attendees?.length ?? 0} Going
-              </Text>
+              <View>
+                <Text style={styles.attendeesSectionTitle}>
+                  {currentEvent.attendees?.length ?? 0} Going
+                </Text>
+                <Text style={styles.attendeesSectionSubtitle}>
+                  RSVP to keep your profile events in sync.
+                </Text>
+              </View>
 
               <TouchableOpacity
+                disabled={rsvpSaving || !currentUid || !currentEvent.id}
                 onPress={handleRsvp}
                 style={[
                   styles.rsvpButton,
                   isAttending && styles.rsvpButtonActive,
+                  (rsvpSaving || !currentUid || !currentEvent.id) && styles.rsvpButtonDisabled,
                 ]}
                 activeOpacity={0.85}
               >
-                <Text
-                  style={[
-                    styles.rsvpButtonText,
-                    isAttending && styles.rsvpButtonTextActive,
-                  ]}
-                >
-                  {isAttending ? "✓ I'm going" : 'RSVP'}
-                </Text>
+                {rsvpSaving ? (
+                  <ActivityIndicator color={isAttending ? '#FFFFFF' : palette.coral} />
+                ) : (
+                  <Text
+                    style={[
+                      styles.rsvpButtonText,
+                      isAttending && styles.rsvpButtonTextActive,
+                    ]}
+                  >
+                    {isAttending ? "✓ I'm going" : 'RSVP'}
+                  </Text>
+                )}
               </TouchableOpacity>
 
               {!!currentEvent.attendees?.length && (
@@ -254,32 +252,32 @@ const styles = StyleSheet.create({
   },
   modalHeader: {
     alignItems: 'center',
-    borderBottomColor: palette.border,
-    borderBottomWidth: 1,
     flexDirection: 'row',
     justifyContent: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingBottom: 12,
+    paddingTop: 10,
   },
   modalTitle: {
     color: palette.textPrimary,
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: 20,
+    fontWeight: '800',
   },
   detailContent: {
-    padding: 16,
     gap: 16,
+    paddingBottom: 28,
+    paddingHorizontal: 16,
   },
   detailImage: {
     backgroundColor: palette.border,
-    borderRadius: 14,
+    borderRadius: 16,
     height: 220,
     width: '100%',
   },
   detailImagePlaceholder: {
     alignItems: 'center',
     backgroundColor: palette.coral,
-    borderRadius: 14,
+    borderRadius: 16,
     height: 220,
     justifyContent: 'center',
     width: '100%',
@@ -291,17 +289,23 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   detailBody: {
+    backgroundColor: palette.card,
+    borderColor: palette.border,
+    borderRadius: 16,
+    borderWidth: 1,
     gap: 8,
+    padding: 16,
   },
   detailTitle: {
     color: palette.textPrimary,
-    fontSize: 24,
-    fontWeight: '700',
+    fontSize: 25,
+    fontWeight: '800',
   },
   detailWhen: {
+    alignSelf: 'flex-start',
     color: palette.coral,
-    fontSize: 15,
-    fontWeight: '700',
+    fontSize: 13,
+    fontWeight: '800',
   },
   detailAddress: {
     color: palette.textMuted,
@@ -330,29 +334,44 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   attendeesSection: {
+    backgroundColor: palette.card,
+    borderColor: palette.border,
+    borderRadius: 16,
+    borderWidth: 1,
     gap: 12,
+    padding: 16,
   },
   attendeesSectionTitle: {
-    color: '#111827',
+    color: palette.textPrimary,
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: '800',
+  },
+  attendeesSectionSubtitle: {
+    color: palette.textMuted,
+    fontSize: 12,
+    marginTop: 3,
   },
   rsvpButton: {
     alignItems: 'center',
-    backgroundColor: '#fff',
-    borderColor: '#6366F1',
+    backgroundColor: palette.card,
+    borderColor: palette.coral,
     borderRadius: 12,
     borderWidth: 1.5,
     minHeight: 48,
     justifyContent: 'center',
+    ...flatOutline,
   },
   rsvpButtonActive: {
-    backgroundColor: '#6366F1',
+    backgroundColor: palette.coral,
+    ...flatButton('coral'),
+  },
+  rsvpButtonDisabled: {
+    opacity: 0.65,
   },
   rsvpButtonText: {
-    color: '#6366F1',
+    color: palette.coral,
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: '800',
   },
   rsvpButtonTextActive: {
     color: '#fff',
@@ -379,12 +398,12 @@ const styles = StyleSheet.create({
     width: 32,
   },
   attendeeAvatarText: {
-    color: '#6366F1',
+    color: palette.coral,
     fontSize: 13,
     fontWeight: '700',
   },
   attendeeName: {
-    color: '#374151',
+    color: palette.textPrimary,
     fontSize: 14,
     fontWeight: '500',
   },

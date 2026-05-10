@@ -1,3 +1,9 @@
+export type Attendee = {
+  uid: string;
+  display_name?: string | null;
+  photo?: string | null;
+};
+
 export type Event = {
   id?: string;
   title: string;
@@ -11,8 +17,10 @@ export type Event = {
   description?: string | null;
   tags?: string[];
   source?: string;
+  author?: string | null;
   location?: {
     type: 'Point';
     coordinates: number[];
   } | null;
+  attendees?: Attendee[];
 };
