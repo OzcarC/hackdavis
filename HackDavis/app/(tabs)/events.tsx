@@ -18,7 +18,13 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { auth } from "../../firebase";
 import { API_BASE } from "@/constants/api";
-import { colorForTag, flatButton, flatOutline, palette } from '@/constants/palette';
+import {
+  colorForTag,
+  flatButton,
+  flatOutline,
+  palette,
+} from "@/constants/palette";
+import AddressAutocomplete from "@/components/address-autocomplete";
 
 const FALLBACK_LOCATION = "Davis, CA";
 const FALLBACK_COORDS = {
@@ -210,6 +216,10 @@ export default function EventsScreen() {
     calendarMonthValue(new Date())
   );
   const [newAddress, setNewAddress] = useState("");
+  const [newAddressCoords, setNewAddressCoords] = useState<{
+    lat: number;
+    lng: number;
+  } | null>(null);
   const [newDescription, setNewDescription] = useState("");
   const [newThumbnail, setNewThumbnail] = useState<string | null>(null);
   const [newTags, setNewTags] = useState<string[]>([]);
@@ -229,13 +239,17 @@ export default function EventsScreen() {
       }
 
       try {
-        const response = await fetch(`${API_BASE}/api/users/${currentUser.uid}`);
+        const response = await fetch(
+          `${API_BASE}/api/users/${currentUser.uid}`
+        );
         if (response.status === 404) {
           setCurrentProfile(null);
           return;
         }
         if (!response.ok) {
-          throw new Error(`Profile request failed with status ${response.status}`);
+          throw new Error(
+            `Profile request failed with status ${response.status}`
+          );
         }
 
         const data = (await response.json()) as UserProfile;
@@ -360,6 +374,7 @@ export default function EventsScreen() {
     setNewMeridiem("PM");
     setCalendarMonth(calendarMonthValue(defaultDate));
     setNewAddress("");
+    setNewAddressCoords(null);
     setNewDescription("");
     setNewThumbnail(null);
     setNewTags([]);
@@ -393,7 +408,10 @@ export default function EventsScreen() {
       const result = geocodedLocations[0];
 
       if (!result) {
-        Alert.alert("Location not found", "Try a more specific city or address.");
+        Alert.alert(
+          "Location not found",
+          "Try a more specific city or address."
+        );
         return;
       }
 
@@ -406,7 +424,10 @@ export default function EventsScreen() {
       setRefreshKey((key) => key + 1);
     } catch (searchError) {
       console.error(searchError);
-      Alert.alert("Search failed", "Could not find events around that location.");
+      Alert.alert(
+        "Search failed",
+        "Could not find events around that location."
+      );
     } finally {
       setLocationSearching(false);
     }
@@ -477,16 +498,17 @@ export default function EventsScreen() {
     setSavingEvent(true);
 
     try {
-      const geocodedAddresses = await Location.geocodeAsync(newAddress.trim());
-      const eventCoords = geocodedAddresses[0];
+      // const geocodedAddresses = await Location.geocodeAsync(newAddress.trim());
 
-      if (!eventCoords) {
+      if (!newAddressCoords) {
         Alert.alert(
           "Address not found",
           "Please enter a more specific address."
         );
         return;
       }
+
+      setSavingEvent(true);
 
       const response = await fetch(`${API_BASE}/api/events`, {
         method: "POST",
@@ -506,7 +528,7 @@ export default function EventsScreen() {
           author: currentUser?.uid ?? null,
           location: {
             type: "Point",
-            coordinates: [eventCoords.longitude, eventCoords.latitude],
+            coordinates: [newAddressCoords.lng, newAddressCoords.lat],
           },
         }),
       });
@@ -602,7 +624,10 @@ export default function EventsScreen() {
             <Text style={styles.modalTitle}>New Event</Text>
           </View>
 
-          <ScrollView contentContainerStyle={styles.form}>
+          <ScrollView
+            contentContainerStyle={styles.form}
+            keyboardShouldPersistTaps="handled"
+          >
             <View style={styles.fieldGroup}>
               <Text style={styles.label}>Title</Text>
               <TextInput
@@ -737,10 +762,7 @@ export default function EventsScreen() {
                         </Text>
                       </TouchableOpacity>
                     ) : (
-                      <View
-                        key={`empty-${index}`}
-                        style={styles.calendarDay}
-                      />
+                      <View key={`empty-${index}`} style={styles.calendarDay} />
                     );
                   })}
                 </View>
@@ -749,12 +771,12 @@ export default function EventsScreen() {
 
             <View style={[styles.fieldGroup, styles.addressFieldGroup]}>
               <Text style={styles.label}>Address</Text>
-              <TextInput
-                onChangeText={setNewAddress}
+              <AddressAutocomplete
+                onAddressSelect={(address, lat, lng) => {
+                  setNewAddress(address);
+                  setNewAddressCoords({ lat, lng });
+                }}
                 placeholder="1 Shields Ave, Davis, CA"
-                placeholderTextColor={palette.textSubtle}
-                style={styles.input}
-                value={newAddress}
               />
             </View>
 
@@ -888,7 +910,11 @@ export default function EventsScreen() {
                     {selectedEvent.tags.map((tag) => (
                       <View
                         key={tag}
-                        style={[styles.tagPill, { backgroundColor: colorForTag(tag) }]}>
+                        style={[
+                          styles.tagPill,
+                          { backgroundColor: colorForTag(tag) },
+                        ]}
+                      >
                         <Text style={styles.tagPillText}>{tag}</Text>
                       </View>
                     ))}
@@ -944,7 +970,8 @@ export default function EventsScreen() {
                           body: JSON.stringify({
                             uid: currentUid,
                             display_name: displayName,
-                            photo: currentProfile?.photo ?? currentUser?.photoURL,
+                            photo:
+                              currentProfile?.photo ?? currentUser?.photoURL,
                           }),
                         }
                       );
@@ -1158,7 +1185,11 @@ export default function EventsScreen() {
                     {item.tags.slice(0, 3).map((tag) => (
                       <View
                         key={tag}
-                        style={[styles.smallTagPill, { backgroundColor: colorForTag(tag) }]}>
+                        style={[
+                          styles.smallTagPill,
+                          { backgroundColor: colorForTag(tag) },
+                        ]}
+                      >
                         <Text style={styles.smallTagPillText}>{tag}</Text>
                       </View>
                     ))}
@@ -1257,7 +1288,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 8,
-    ...flatButton('coral'),
+    ...flatButton("coral"),
   },
   addButtonText: {
     color: "#fff",
@@ -1309,7 +1340,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   modalHeader: {
-    alignItems: 'center',
+    alignItems: "center",
     borderBottomColor: palette.border,
     borderBottomWidth: 1,
     flexDirection: "row",
@@ -1468,7 +1499,7 @@ const styles = StyleSheet.create({
     minHeight: 110,
   },
   photoButton: {
-    alignItems: 'center',
+    alignItems: "center",
     backgroundColor: palette.card,
     borderColor: palette.border,
     borderRadius: 12,
@@ -1519,13 +1550,13 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   createButton: {
-    alignItems: 'center',
+    alignItems: "center",
     backgroundColor: palette.coral,
     borderRadius: 12,
     flex: 1,
     minHeight: 48,
     justifyContent: "center",
-    ...flatButton('coral'),
+    ...flatButton("coral"),
   },
   createButtonDisabled: {
     opacity: 0.6,
@@ -1536,7 +1567,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   cancelButton: {
-    alignItems: 'center',
+    alignItems: "center",
     backgroundColor: palette.card,
     borderColor: palette.border,
     borderRadius: 12,
@@ -1562,7 +1593,7 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   detailImagePlaceholder: {
-    alignItems: 'center',
+    alignItems: "center",
     backgroundColor: palette.coral,
     borderRadius: 14,
     height: 220,
@@ -1570,9 +1601,9 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   detailImagePlaceholderText: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: "700",
     letterSpacing: 0.5,
   },
   detailBody: {
@@ -1610,17 +1641,17 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
   },
   tagPillText: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
     fontSize: 12,
     fontWeight: "700",
   },
   detailLinkButton: {
-    alignItems: 'center',
+    alignItems: "center",
     backgroundColor: palette.coral,
     borderRadius: 12,
     minHeight: 48,
     justifyContent: "center",
-    ...flatButton('coral'),
+    ...flatButton("coral"),
   },
   detailLinkButtonText: {
     color: "#fff",
@@ -1628,7 +1659,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   detailCloseButton: {
-    alignItems: 'center',
+    alignItems: "center",
     backgroundColor: palette.card,
     borderColor: palette.border,
     borderRadius: 12,
@@ -1731,22 +1762,22 @@ const styles = StyleSheet.create({
   },
   thumb: {
     backgroundColor: palette.border,
-    alignSelf: 'stretch',
+    alignSelf: "stretch",
     minHeight: 112,
     width: 90,
   },
   thumbPlaceholder: {
-    alignItems: 'center',
+    alignItems: "center",
     backgroundColor: palette.coral,
-    alignSelf: 'stretch',
-    justifyContent: 'center',
+    alignSelf: "stretch",
+    justifyContent: "center",
     minHeight: 112,
     width: 90,
   },
   thumbPlaceholderText: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: "700",
     letterSpacing: 0.5,
   },
   info: {
@@ -1785,7 +1816,7 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
   },
   smallTagPillText: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
     fontSize: 10,
     fontWeight: "700",
   },
@@ -1806,15 +1837,15 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   retryButton: {
-    alignItems: 'center',
-    alignSelf: 'center',
+    alignItems: "center",
+    alignSelf: "center",
     backgroundColor: palette.navy,
     borderRadius: 12,
     marginTop: 16,
     minHeight: 44,
     justifyContent: "center",
     paddingHorizontal: 18,
-    ...flatButton('navy'),
+    ...flatButton("navy"),
   },
   retryButtonText: {
     color: "#fff",
