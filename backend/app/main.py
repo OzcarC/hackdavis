@@ -1,14 +1,12 @@
 from typing import Any
 
-import httpx
 from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorDatabase
-from pydantic import ValidationError
 from pymongo import ReturnDocument
 from pymongo.errors import DuplicateKeyError, OperationFailure
 
-from app.config import Settings, get_settings
+from app.config import get_settings
 from app.database import database_lifespan, get_database
 from app.models import EventIn, EventOut, UserProfileIn, UserProfileOut, serialize_event, serialize_user_profile
 
@@ -34,8 +32,7 @@ async def health(db: AsyncIOMotorDatabase = Depends(get_database)) -> dict[str, 
 async def events_count(db: AsyncIOMotorDatabase = Depends(get_database)) -> dict[str, int]:
     total = await db.events.count_documents({})
     custom = await db.events.count_documents({"source": "custom"})
-    serpapi = await db.events.count_documents({"source": "serpapi"})
-    return {"total": total, "custom": custom, "serpapi": serpapi}
+    return {"total": total, "custom": custom}
 
 
 @app.get("/api/users/{uid}", response_model=UserProfileOut)
@@ -72,40 +69,11 @@ async def upsert_user_profile(
 @app.get("/api/events", response_model=list[EventOut])
 async def list_events(
     limit: int = Query(default=50, ge=1, le=100),
-    query: str | None = None,
-    location: str | None = None,
     lat: float | None = None,
     lng: float | None = None,
     radius: int = Query(default=25000, ge=1000, le=100000),
-    date: str = "date:week",
-    refresh: bool = False,
     db: AsyncIOMotorDatabase = Depends(get_database),
-    app_settings: Settings = Depends(get_settings),
 ) -> list[EventOut]:
-    should_import = refresh or bool(query or location)
-    if should_import:
-        if not query or not location:
-            raise HTTPException(
-                status_code=400,
-                detail="query and location are required when importing events.",
-            )
-
-        imported_events = await fetch_and_store_serpapi_events(
-            db=db,
-            app_settings=app_settings,
-            query=query,
-            location=location,
-            date=date,
-        )
-        custom_events = await fetch_custom_events(
-            db=db,
-            limit=limit,
-            lat=lat,
-            lng=lng,
-            radius=radius,
-        )
-        return custom_events + imported_events
-
     return await fetch_custom_events(db=db, limit=limit, lat=lat, lng=lng, radius=radius)
 
 
@@ -127,70 +95,6 @@ async def create_event(
         raise HTTPException(status_code=500, detail="Event was not saved.")
 
     return serialize_event(saved)
-
-
-@app.post("/api/events/import/serpapi", response_model=list[EventOut])
-async def import_serpapi_events(
-    query: str = "events near me",
-    location: str = "New York, NY",
-    date: str = "date:week",
-    db: AsyncIOMotorDatabase = Depends(get_database),
-    app_settings: Settings = Depends(get_settings),
-) -> list[EventOut]:
-    return await fetch_and_store_serpapi_events(
-        db=db,
-        app_settings=app_settings,
-        query=query,
-        location=location,
-        date=date,
-    )
-
-
-async def fetch_and_store_serpapi_events(
-    db: AsyncIOMotorDatabase,
-    app_settings: Settings,
-    query: str,
-    location: str,
-    date: str,
-) -> list[EventOut]:
-    if not app_settings.serpapi_key:
-        raise HTTPException(status_code=500, detail="SERPAPI_KEY is not configured.")
-
-    params = {
-        "engine": "google_events",
-        "q": query,
-        "location": location,
-        "hl": "en",
-        "gl": "us",
-        "htichips": date,
-        "api_key": app_settings.serpapi_key,
-    }
-
-    async with httpx.AsyncClient(timeout=20) as client:
-        response = await client.get("https://serpapi.com/search.json", params=params)
-        response.raise_for_status()
-        data: dict[str, Any] = response.json()
-
-    imported: list[EventOut] = []
-    for raw_event in data.get("events_results", []):
-        try:
-            event = EventIn.model_validate(raw_event).model_dump()
-        except ValidationError:
-            continue
-
-        if not event["link"]:
-            continue
-
-        event["source"] = "serpapi"
-        saved = await db.events.find_one_and_update(
-            {"link": event["link"]},
-            {"$set": event},
-            upsert=True,
-            return_document=ReturnDocument.AFTER,
-        )
-        imported.append(serialize_event(saved))
-
-    return imported
 
 
 async def fetch_custom_events(

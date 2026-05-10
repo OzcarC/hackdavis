@@ -159,12 +159,9 @@ export default function EventsScreen() {
 
       try {
         const params = new URLSearchParams({
-          query: 'events near me',
-          location: eventLocation,
           lat: String(eventCoordinates.latitude),
           lng: String(eventCoordinates.longitude),
           radius: '25000',
-          date: filter,
         });
         const eventsUrl = `${API_BASE}/api/events?${params.toString()}`;
         console.log(`Fetching events from ${eventsUrl}`);

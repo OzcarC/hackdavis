@@ -42,9 +42,8 @@ The API will be available at `http://localhost:3000`.
 
 - `GET /health` checks the API and MongoDB connection.
 - `GET /api/events` returns saved events from MongoDB.
-- `GET /api/events?query=events near me&location=New York, NY&date=date:week` fetches from SerpAPI, upserts into MongoDB, and returns the imported events.
+- `GET /api/events?lat=38.5449&lng=-121.7405&radius=25000` returns custom events near those coordinates.
 - `POST /api/events` saves one event to MongoDB.
-- `POST /api/events/import/serpapi` fetches Google Events through SerpAPI and stores them.
 
 ## React Native API Base
 
