@@ -109,6 +109,23 @@ async def create_event(
     return serialize_event(saved)
 
 
+@app.get("/api/events/{event_id}", response_model=EventOut)
+async def get_event(
+    event_id: str,
+    db: AsyncIOMotorDatabase = Depends(get_database),
+) -> EventOut:
+    try:
+        event_object_id = ObjectId(event_id)
+    except InvalidId:
+        raise HTTPException(status_code=404, detail="Event not found.") from None
+
+    event = await db.events.find_one({"_id": event_object_id})
+    if event is None:
+        raise HTTPException(status_code=404, detail="Event not found.")
+
+    return serialize_event(event)
+
+
 async def fetch_custom_events(
     db: AsyncIOMotorDatabase,
     limit: int,

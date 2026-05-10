@@ -17,7 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 
 import { API_BASE } from '@/constants/api';
-import { colorForTag, palette } from '@/constants/palette';
+import { palette } from '@/constants/palette';
 import { auth } from '../../firebase';
 
 type UserProfile = {

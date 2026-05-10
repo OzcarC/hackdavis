@@ -1,8 +1,16 @@
 import { useState, useEffect } from "react";
-import { ActivityIndicator, Image, Platform, StyleSheet, Text, View } from "react-native";
+import {
+  ActivityIndicator,
+  Image,
+  Platform,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import * as Location from "expo-location";
-import MapView, { Callout, Marker, Region } from "react-native-maps";
 import { router } from "expo-router";
+import MapView, { Callout, Marker, Region } from "react-native-maps";
 
 import { API_BASE } from "../../constants/api";
 
@@ -29,7 +37,11 @@ type Event = {
   } | null;
 };
 
-const withTimeout = async <T,>(promise: Promise<T>, timeoutMs: number, message: string) => {
+const withTimeout = async <T,>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  message: string
+) => {
   let timeoutId: ReturnType<typeof setTimeout>;
   const timeout = new Promise<never>((_, reject) => {
     timeoutId = setTimeout(() => reject(new Error(message)), timeoutMs);
@@ -103,11 +115,23 @@ const eventCoordinate = (event: Event) => {
   return { latitude, longitude };
 };
 
+const openEventDetails = (eventId?: string) => {
+  if (!eventId) {
+    return;
+  }
+
+  router.push({
+    pathname: "/events/[id]",
+    params: { id: eventId },
+  });
+};
+
 export default function MapScreen() {
   const [initialRegion, setInitialRegion] = useState<Region | null>(null);
   const [events, setEvents] = useState<Event[]>([]);
   const [eventsLoading, setEventsLoading] = useState(false);
   const [eventsError, setEventsError] = useState<string | null>(null);
+  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -162,7 +186,9 @@ export default function MapScreen() {
         );
 
         if (!response.ok) {
-          throw new Error(`Events request failed with status ${response.status}`);
+          throw new Error(
+            `Events request failed with status ${response.status}`
+          );
         }
 
         const data = (await response.json()) as Event[];
@@ -206,60 +232,87 @@ export default function MapScreen() {
 
           return (
             <Marker
+              anchor={{ x: 0.5, y: 1 }}
+              calloutAnchor={{ x: 0.5, y: 0 }}
               coordinate={coordinate}
               key={event.id ?? `${event.title}-${index}`}
-              title={event.title}
-              tracksViewChanges={false}
+              onPress={() => {
+                if (Platform.OS === "android") {
+                  setSelectedEvent(event);
+                }
+              }}
+              tracksViewChanges={Platform.OS === "android"}
             >
-              <View style={[styles.markerBubble, { borderColor: markerColor(event) }]}>
-                <Text style={styles.markerEmoji}>{markerEmoji(event)}</Text>
-              </View>
-              <View style={[styles.markerTail, { borderTopColor: markerColor(event) }]} />
-              <Callout
-                  tooltip={false}
-                  onPress={() => {
-                    if (event.id) {
-                      router.push(`/events/${event.id}`);
-                    }
-                  }}
+              <View collapsable={false} style={styles.markerContainer}>
+                <View
+                  style={[
+                    styles.markerBubble,
+                    { borderColor: markerColor(event) },
+                  ]}
                 >
-                <View style={styles.callout}>
-                  {event.thumbnail ? (
-                    <Image source={{ uri: event.thumbnail }} style={styles.calloutImage} />
-                  ) : (
-                    <View style={[styles.calloutImageFallback, { backgroundColor: markerColor(event) }]}>
-                      <Text style={styles.calloutImageFallbackText}>{markerEmoji(event)}</Text>
-                    </View>
-                  )}
-                  <Text numberOfLines={2} style={styles.calloutTitle}>
-                    {event.title}
-                  </Text>
-                  {!!event.date?.when && (
-                    <Text numberOfLines={1} style={styles.calloutText}>
-                      {event.date.when}
-                    </Text>
-                  )}
-                  {!!event.address?.length && (
-                    <Text numberOfLines={2} style={styles.calloutText}>
-                      {event.address.join(", ")}
-                    </Text>
-                  )}
-                  {!!event.description && (
-                    <Text numberOfLines={2} style={styles.calloutDescription}>
-                      {event.description}
-                    </Text>
-                  )}
-                  {!!event.tags?.length && (
-                    <View style={styles.tagRow}>
-                      {event.tags.slice(0, 2).map((tag) => (
-                        <View key={tag} style={styles.tagPill}>
-                          <Text style={styles.tagPillText}>{tag}</Text>
-                        </View>
-                      ))}
-                    </View>
-                  )}
+                  <Text style={styles.markerEmoji}>{markerEmoji(event)}</Text>
                 </View>
-              </Callout>
+                <View
+                  style={[
+                    styles.markerTail,
+                    { borderTopColor: markerColor(event) },
+                  ]}
+                />
+              </View>
+              {Platform.OS !== "android" && (
+                <Callout
+                  onPress={() => openEventDetails(event.id)}
+                  tooltip={false}
+                  style={styles.calloutWrapper}
+                >
+                  <View collapsable={false} style={styles.callout}>
+                    {event.thumbnail ? (
+                      <Image
+                        source={{ uri: event.thumbnail }}
+                        style={styles.calloutImage}
+                      />
+                    ) : (
+                      <View
+                        style={[
+                          styles.calloutImageFallback,
+                          { backgroundColor: markerColor(event) },
+                        ]}
+                      >
+                        <Text style={styles.calloutImageFallbackText}>
+                          {markerEmoji(event)}
+                        </Text>
+                      </View>
+                    )}
+                    <Text numberOfLines={2} style={styles.calloutTitle}>
+                      {event.title}
+                    </Text>
+                    {!!event.date?.when && (
+                      <Text numberOfLines={1} style={styles.calloutText}>
+                        {event.date.when}
+                      </Text>
+                    )}
+                    {!!event.address?.length && (
+                      <Text numberOfLines={2} style={styles.calloutText}>
+                        {event.address.join(", ")}
+                      </Text>
+                    )}
+                    {!!event.description && (
+                      <Text numberOfLines={2} style={styles.calloutDescription}>
+                        {event.description}
+                      </Text>
+                    )}
+                    {!!event.tags?.length && (
+                      <View style={styles.tagRow}>
+                        {event.tags.slice(0, 2).map((tag) => (
+                          <View key={tag} style={styles.tagPill}>
+                            <Text style={styles.tagPillText}>{tag}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    )}
+                  </View>
+                </Callout>
+              )}
             </Marker>
           );
         })}
@@ -270,8 +323,79 @@ export default function MapScreen() {
           <Text style={styles.statusBadgeText}>
             {eventsLoading
               ? "Loading events"
-              : eventsError ?? `${events.length} event${events.length === 1 ? "" : "s"} nearby`}
+              : eventsError ??
+                `${events.length} event${
+                  events.length === 1 ? "" : "s"
+                } nearby`}
           </Text>
+        </View>
+      )}
+      {Platform.OS === "android" && selectedEvent && (
+        <View style={styles.androidPreview}>
+          <TouchableOpacity
+            accessibilityLabel="Close event preview"
+            activeOpacity={0.75}
+            onPress={() => setSelectedEvent(null)}
+            style={styles.previewCloseButton}
+          >
+            <Text style={styles.previewCloseText}>×</Text>
+          </TouchableOpacity>
+          <View style={styles.previewContent}>
+            {selectedEvent.thumbnail ? (
+              <Image
+                source={{ uri: selectedEvent.thumbnail }}
+                style={styles.previewImage}
+              />
+            ) : (
+              <View
+                style={[
+                  styles.previewImageFallback,
+                  { backgroundColor: markerColor(selectedEvent) },
+                ]}
+              >
+                <Text style={styles.previewImageFallbackText}>
+                  {markerEmoji(selectedEvent)}
+                </Text>
+              </View>
+            )}
+            <View style={styles.previewBody}>
+              <Text numberOfLines={2} style={styles.previewTitle}>
+                {selectedEvent.title}
+              </Text>
+              {!!selectedEvent.date?.when && (
+                <Text numberOfLines={1} style={styles.previewMeta}>
+                  {selectedEvent.date.when}
+                </Text>
+              )}
+              {!!selectedEvent.address?.length && (
+                <Text numberOfLines={2} style={styles.previewMeta}>
+                  {selectedEvent.address.join(", ")}
+                </Text>
+              )}
+              {!!selectedEvent.description && (
+                <Text numberOfLines={2} style={styles.previewDescription}>
+                  {selectedEvent.description}
+                </Text>
+              )}
+            </View>
+          </View>
+          {!!selectedEvent.tags?.length && (
+            <View style={styles.previewTagRow}>
+              {selectedEvent.tags.slice(0, 3).map((tag) => (
+                <View key={tag} style={styles.tagPill}>
+                  <Text style={styles.tagPillText}>{tag}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+          <TouchableOpacity
+            activeOpacity={0.85}
+            disabled={!selectedEvent.id}
+            onPress={() => openEventDetails(selectedEvent.id)}
+            style={styles.previewDetailsButton}
+          >
+            <Text style={styles.previewDetailsText}>View details</Text>
+          </TouchableOpacity>
         </View>
       )}
     </View>
@@ -292,22 +416,33 @@ const styles = StyleSheet.create({
     color: "#6B7280",
     fontSize: 14,
   },
+  markerContainer: {
+    alignItems: "center",
+    height: 64,
+    justifyContent: "flex-start",
+    overflow: "visible",
+    paddingTop: 4,
+    width: 36,
+  },
   markerBubble: {
     alignItems: "center",
     backgroundColor: "#fff",
-    borderRadius: 18,
+    borderRadius: 20,
     borderWidth: 2,
     elevation: 3,
-    height: 36,
+    height: 40,
     justifyContent: "center",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.14,
     shadowRadius: 5,
-    width: 36,
+    width: 40,
   },
   markerEmoji: {
-    fontSize: 18,
+    includeFontPadding: false,
+    fontSize: 19,
+    lineHeight: 23,
+    textAlign: "center",
   },
   markerTail: {
     alignSelf: "center",
@@ -320,9 +455,11 @@ const styles = StyleSheet.create({
     marginTop: -1,
     width: 0,
   },
+  calloutWrapper: {
+    width: 240,
+  },
   callout: {
-    maxWidth: 240,
-    minWidth: 220,
+    width: 240,
     padding: 10,
   },
   calloutImage: {
@@ -394,5 +531,101 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 12,
     fontWeight: "600",
+  },
+  androidPreview: {
+    backgroundColor: "#fff",
+    borderColor: "#E5E7EB",
+    borderRadius: 16,
+    borderWidth: 1,
+    bottom: 18,
+    elevation: 8,
+    left: 14,
+    padding: 12,
+    position: "absolute",
+    right: 14,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
+  },
+  previewCloseButton: {
+    alignItems: "center",
+    backgroundColor: "rgba(17, 24, 39, 0.72)",
+    borderRadius: 14,
+    height: 28,
+    justifyContent: "center",
+    position: "absolute",
+    right: 8,
+    top: 8,
+    width: 28,
+    zIndex: 2,
+  },
+  previewCloseText: {
+    color: "#fff",
+    fontSize: 20,
+    fontWeight: "700",
+    lineHeight: 22,
+  },
+  previewContent: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  previewImage: {
+    backgroundColor: "#E5E7EB",
+    borderRadius: 10,
+    height: 96,
+    width: 96,
+  },
+  previewImageFallback: {
+    alignItems: "center",
+    borderRadius: 10,
+    height: 96,
+    justifyContent: "center",
+    width: 96,
+  },
+  previewImageFallbackText: {
+    color: "#fff",
+    fontSize: 34,
+    fontWeight: "700",
+  },
+  previewBody: {
+    flex: 1,
+    paddingRight: 20,
+  },
+  previewTitle: {
+    color: "#111827",
+    fontSize: 16,
+    fontWeight: "700",
+    lineHeight: 20,
+  },
+  previewMeta: {
+    color: "#4B5563",
+    fontSize: 12,
+    marginTop: 4,
+  },
+  previewDescription: {
+    color: "#6B7280",
+    fontSize: 12,
+    lineHeight: 16,
+    marginTop: 6,
+  },
+  previewTagRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    marginTop: 10,
+  },
+  previewDetailsButton: {
+    alignItems: "center",
+    backgroundColor: "#6366F1",
+    borderRadius: 12,
+    justifyContent: "center",
+    marginTop: 12,
+    minHeight: 44,
+  },
+  previewDetailsText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "700",
   },
 });
