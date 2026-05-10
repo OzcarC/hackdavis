@@ -98,6 +98,96 @@ const filters = [
   { label: "Online", value: "event_type:Virtual-Event" },
 ];
 
+const pad2 = (value: number) => String(value).padStart(2, "0");
+
+const dateInputValue = (date: Date) =>
+  `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+
+const defaultEventDate = () => dateInputValue(new Date());
+
+const calendarMonthValue = (date: Date) =>
+  new Date(date.getFullYear(), date.getMonth(), 1);
+
+const calendarDayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+const monthLabel = (date: Date) =>
+  new Intl.DateTimeFormat("en-US", {
+    month: "long",
+    year: "numeric",
+  }).format(date);
+
+const calendarDaysForMonth = (date: Date) => {
+  const firstDay = new Date(date.getFullYear(), date.getMonth(), 1);
+  const daysInMonth = new Date(
+    date.getFullYear(),
+    date.getMonth() + 1,
+    0
+  ).getDate();
+  const days: (Date | null)[] = Array.from(
+    { length: firstDay.getDay() },
+    () => null
+  );
+
+  for (let day = 1; day <= daysInMonth; day += 1) {
+    days.push(new Date(date.getFullYear(), date.getMonth(), day));
+  }
+
+  return days;
+};
+
+type Meridiem = "AM" | "PM";
+
+const parseEventDateTime = (
+  dateValue: string,
+  timeValue: string,
+  meridiem: Meridiem
+) => {
+  const dateMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateValue.trim());
+  const timeMatch = /^(\d{1,2}):(\d{2})$/.exec(timeValue.trim());
+
+  if (!dateMatch || !timeMatch) {
+    return null;
+  }
+
+  const year = Number(dateMatch[1]);
+  const monthIndex = Number(dateMatch[2]) - 1;
+  const day = Number(dateMatch[3]);
+  const hour12 = Number(timeMatch[1]);
+  const minutes = Number(timeMatch[2]);
+
+  if (hour12 < 1 || hour12 > 12 || minutes > 59) {
+    return null;
+  }
+
+  const hours =
+    meridiem === "AM" ? hour12 % 12 : hour12 === 12 ? 12 : hour12 + 12;
+  const parsed = new Date(year, monthIndex, day, hours, minutes);
+
+  if (
+    parsed.getFullYear() !== year ||
+    parsed.getMonth() !== monthIndex ||
+    parsed.getDate() !== day
+  ) {
+    return null;
+  }
+
+  return parsed;
+};
+
+const formatEventWhen = (date: Date) => {
+  const datePart = new Intl.DateTimeFormat("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  }).format(date);
+  const timePart = new Intl.DateTimeFormat("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(date);
+
+  return `${datePart} · ${timePart}`;
+};
+
 export default function EventsScreen() {
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
@@ -111,7 +201,12 @@ export default function EventsScreen() {
   const [savingEvent, setSavingEvent] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [newTitle, setNewTitle] = useState("");
-  const [newWhen, setNewWhen] = useState("");
+  const [newDate, setNewDate] = useState(defaultEventDate);
+  const [newTime, setNewTime] = useState("6:00");
+  const [newMeridiem, setNewMeridiem] = useState<Meridiem>("PM");
+  const [calendarMonth, setCalendarMonth] = useState(() =>
+    calendarMonthValue(new Date())
+  );
   const [newAddress, setNewAddress] = useState("");
   const [newDescription, setNewDescription] = useState("");
   const [newThumbnail, setNewThumbnail] = useState<string | null>(null);
@@ -122,6 +217,7 @@ export default function EventsScreen() {
   );
 
   const currentUser = auth.currentUser;
+  const calendarDays = calendarDaysForMonth(calendarMonth);
 
   useEffect(() => {
     const fetchCurrentProfile = async () => {
@@ -254,8 +350,13 @@ export default function EventsScreen() {
   ]);
 
   const resetCreateForm = () => {
+    const defaultDate = new Date();
+
     setNewTitle("");
-    setNewWhen("");
+    setNewDate(dateInputValue(defaultDate));
+    setNewTime("6:00");
+    setNewMeridiem("PM");
+    setCalendarMonth(calendarMonthValue(defaultDate));
     setNewAddress("");
     setNewDescription("");
     setNewThumbnail(null);
@@ -268,6 +369,29 @@ export default function EventsScreen() {
         ? currentTags.filter((currentTag) => currentTag !== tag)
         : [...currentTags, tag]
     );
+  };
+
+  const setQuickDate = (offsetDays: number) => {
+    const nextDate = new Date();
+    nextDate.setDate(nextDate.getDate() + offsetDays);
+    setNewDate(dateInputValue(nextDate));
+    setCalendarMonth(calendarMonthValue(nextDate));
+  };
+
+  const moveCalendarMonth = (offsetMonths: number) => {
+    setCalendarMonth(
+      (currentMonth) =>
+        new Date(
+          currentMonth.getFullYear(),
+          currentMonth.getMonth() + offsetMonths,
+          1
+        )
+    );
+  };
+
+  const selectCalendarDate = (date: Date) => {
+    setNewDate(dateInputValue(date));
+    setCalendarMonth(calendarMonthValue(date));
   };
 
   const pickThumbnail = async () => {
@@ -302,7 +426,9 @@ export default function EventsScreen() {
   };
 
   const createEvent = async () => {
-    if (!newTitle.trim() || !newWhen.trim() || !newAddress.trim()) {
+    const eventDateTime = parseEventDateTime(newDate, newTime, newMeridiem);
+
+    if (!newTitle.trim() || !eventDateTime || !newAddress.trim()) {
       Alert.alert("Missing fields", "Please add a title, time, and address.");
       return;
     }
@@ -329,8 +455,8 @@ export default function EventsScreen() {
         body: JSON.stringify({
           title: newTitle.trim(),
           date: {
-            start_date: newWhen.trim(),
-            when: newWhen.trim(),
+            start_date: eventDateTime.toISOString(),
+            when: formatEventWhen(eventDateTime),
           },
           address: [newAddress.trim()],
           description: newDescription.trim() || null,
@@ -421,16 +547,138 @@ export default function EventsScreen() {
 
             <View style={styles.fieldGroup}>
               <Text style={styles.label}>When</Text>
-              <TextInput
-                onChangeText={setNewWhen}
-                placeholder="Sat, May 16, 2:00 PM"
-                placeholderTextColor={palette.textSubtle}
-                style={styles.input}
-                value={newWhen}
-              />
+              <View style={styles.dateTimeRow}>
+                <TextInput
+                  autoCapitalize="none"
+                  keyboardType="numbers-and-punctuation"
+                  onChangeText={setNewDate}
+                  placeholder="YYYY-MM-DD"
+                  placeholderTextColor={palette.textSubtle}
+                  style={[styles.input, styles.dateInput]}
+                  value={newDate}
+                />
+                <TextInput
+                  autoCapitalize="none"
+                  keyboardType="numbers-and-punctuation"
+                  onChangeText={setNewTime}
+                  placeholder="6:00"
+                  placeholderTextColor={palette.textSubtle}
+                  style={[styles.input, styles.timeInput]}
+                  value={newTime}
+                />
+                <View style={styles.meridiemToggle}>
+                  {(["AM", "PM"] as Meridiem[]).map((value) => {
+                    const selected = newMeridiem === value;
+
+                    return (
+                      <TouchableOpacity
+                        activeOpacity={0.8}
+                        key={value}
+                        onPress={() => setNewMeridiem(value)}
+                        style={[
+                          styles.meridiemOption,
+                          selected && styles.meridiemOptionSelected,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.meridiemText,
+                            selected && styles.meridiemTextSelected,
+                          ]}
+                        >
+                          {value}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+              <View style={styles.quickDateRow}>
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={() => setQuickDate(0)}
+                  style={styles.quickDateButton}
+                >
+                  <Text style={styles.quickDateText}>Today</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={() => setQuickDate(1)}
+                  style={styles.quickDateButton}
+                >
+                  <Text style={styles.quickDateText}>Tomorrow</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={() => setQuickDate(7)}
+                  style={styles.quickDateButton}
+                >
+                  <Text style={styles.quickDateText}>Next week</Text>
+                </TouchableOpacity>
+              </View>
+              <View style={styles.calendar}>
+                <View style={styles.calendarHeader}>
+                  <TouchableOpacity
+                    accessibilityLabel="Previous month"
+                    activeOpacity={0.8}
+                    onPress={() => moveCalendarMonth(-1)}
+                    style={styles.calendarNavButton}
+                  >
+                    <Text style={styles.calendarNavText}>‹</Text>
+                  </TouchableOpacity>
+                  <Text style={styles.calendarMonth}>
+                    {monthLabel(calendarMonth)}
+                  </Text>
+                  <TouchableOpacity
+                    accessibilityLabel="Next month"
+                    activeOpacity={0.8}
+                    onPress={() => moveCalendarMonth(1)}
+                    style={styles.calendarNavButton}
+                  >
+                    <Text style={styles.calendarNavText}>›</Text>
+                  </TouchableOpacity>
+                </View>
+                <View style={styles.calendarGrid}>
+                  {calendarDayLabels.map((dayLabel) => (
+                    <Text key={dayLabel} style={styles.calendarDayLabel}>
+                      {dayLabel}
+                    </Text>
+                  ))}
+                  {calendarDays.map((date, index) => {
+                    const selected =
+                      date !== null && dateInputValue(date) === newDate;
+
+                    return date ? (
+                      <TouchableOpacity
+                        activeOpacity={0.8}
+                        key={date.toISOString()}
+                        onPress={() => selectCalendarDate(date)}
+                        style={[
+                          styles.calendarDay,
+                          selected && styles.calendarDaySelected,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.calendarDayText,
+                            selected && styles.calendarDayTextSelected,
+                          ]}
+                        >
+                          {date.getDate()}
+                        </Text>
+                      </TouchableOpacity>
+                    ) : (
+                      <View
+                        key={`empty-${index}`}
+                        style={styles.calendarDay}
+                      />
+                    );
+                  })}
+                </View>
+              </View>
             </View>
 
-            <View style={styles.fieldGroup}>
+            <View style={[styles.fieldGroup, styles.addressFieldGroup]}>
               <Text style={styles.label}>Address</Text>
               <TextInput
                 onChangeText={setNewAddress}
@@ -977,6 +1225,9 @@ const styles = StyleSheet.create({
   fieldGroup: {
     gap: 6,
   },
+  addressFieldGroup: {
+    marginTop: -6,
+  },
   label: {
     color: palette.textPrimary,
     fontSize: 13,
@@ -992,6 +1243,122 @@ const styles = StyleSheet.create({
     minHeight: 48,
     paddingHorizontal: 14,
     paddingVertical: 12,
+  },
+  dateTimeRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  dateInput: {
+    flex: 1,
+  },
+  timeInput: {
+    width: 78,
+  },
+  meridiemToggle: {
+    backgroundColor: palette.border,
+    borderRadius: 12,
+    flexDirection: "row",
+    padding: 4,
+  },
+  meridiemOption: {
+    alignItems: "center",
+    borderRadius: 9,
+    justifyContent: "center",
+    minHeight: 40,
+    width: 48,
+  },
+  meridiemOptionSelected: {
+    backgroundColor: palette.coral,
+  },
+  meridiemText: {
+    color: palette.textPrimary,
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  meridiemTextSelected: {
+    color: "#fff",
+  },
+  quickDateRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 2,
+  },
+  quickDateButton: {
+    backgroundColor: palette.card,
+    borderColor: palette.border,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  quickDateText: {
+    color: palette.textPrimary,
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  calendar: {
+    backgroundColor: palette.card,
+    borderColor: palette.border,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    padding: 12,
+  },
+  calendarHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 10,
+  },
+  calendarNavButton: {
+    alignItems: "center",
+    borderColor: palette.border,
+    borderRadius: 10,
+    borderWidth: 1,
+    height: 36,
+    justifyContent: "center",
+    width: 36,
+  },
+  calendarNavText: {
+    color: palette.textPrimary,
+    fontSize: 24,
+    fontWeight: "700",
+    lineHeight: 26,
+  },
+  calendarMonth: {
+    color: palette.textPrimary,
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  calendarGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+  },
+  calendarDayLabel: {
+    color: palette.textMuted,
+    fontSize: 11,
+    fontWeight: "700",
+    textAlign: "center",
+    width: `${100 / 7}%`,
+  },
+  calendarDay: {
+    alignItems: "center",
+    height: 42,
+    justifyContent: "center",
+    marginTop: 4,
+    width: `${100 / 7}%`,
+  },
+  calendarDaySelected: {
+    backgroundColor: palette.coral,
+    borderRadius: 18,
+  },
+  calendarDayText: {
+    color: palette.textPrimary,
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  calendarDayTextSelected: {
+    color: "#fff",
   },
   textArea: {
     minHeight: 110,
