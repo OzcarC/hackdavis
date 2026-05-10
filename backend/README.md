@@ -33,10 +33,11 @@ MONGODB_DB_NAME=hackdavis
 5. Start the API:
 
 ```sh
-uvicorn app.main:app --reload --port 3000
+uvicorn app.main:app --reload --host 0.0.0.0 --port 3000
 ```
 
-The API will be available at `http://localhost:3000`.
+The API will be available from the same computer at `http://localhost:3000`
+and from other devices on your network at `http://YOUR_LAN_IP:3000`.
 
 ## Endpoints
 

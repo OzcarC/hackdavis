@@ -1,6 +1,6 @@
-import * as ImagePicker from 'expo-image-picker';
-import * as Location from 'expo-location';
-import React, { useEffect, useState } from 'react';
+import * as ImagePicker from "expo-image-picker";
+import * as Location from "expo-location";
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -14,18 +14,22 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { auth } from "../../firebase";
+import { API_BASE } from "@/constants/api";
 
-import { API_BASE } from '@/constants/api';
-
-const FALLBACK_LOCATION = 'Davis, CA';
+const FALLBACK_LOCATION = "Davis, CA";
 const FALLBACK_COORDS = {
   latitude: 38.5449,
   longitude: -121.7405,
 };
 
-const withTimeout = async <T,>(promise: Promise<T>, timeoutMs: number, message: string) => {
+const withTimeout = async <T,>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  message: string
+) => {
   let timeoutId: ReturnType<typeof setTimeout>;
   const timeout = new Promise<never>((_, reject) => {
     timeoutId = setTimeout(() => reject(new Error(message)), timeoutMs);
@@ -36,6 +40,19 @@ const withTimeout = async <T,>(promise: Promise<T>, timeoutMs: number, message: 
   } finally {
     clearTimeout(timeoutId!);
   }
+};
+
+type Attendee = {
+  uid: string;
+  display_name?: string | null;
+  photo?: string | null;
+};
+
+type UserProfile = {
+  uid: string;
+  email?: string | null;
+  display_name?: string | null;
+  photo?: string | null;
 };
 
 type Event = {
@@ -51,31 +68,33 @@ type Event = {
   description?: string | null;
   tags?: string[];
   source?: string;
+  author?: string | null;
   location?: {
-    type: 'Point';
+    type: "Point";
     coordinates: number[];
   } | null;
+  attendees?: Attendee[];
 };
 
 const eventTagOptions = [
-  'Career',
-  'Community',
-  'Food',
-  'Hackathon',
-  'Music',
-  'Networking',
-  'Social',
-  'Sports',
-  'Study',
-  'Volunteer',
-  'Workshop',
+  "Career",
+  "Community",
+  "Food",
+  "Hackathon",
+  "Music",
+  "Networking",
+  "Social",
+  "Sports",
+  "Study",
+  "Volunteer",
+  "Workshop",
 ];
 
 const filters = [
-  { label: 'Today', value: 'date:today' },
-  { label: 'This week', value: 'date:week' },
-  { label: 'This month', value: 'date:month' },
-  { label: 'Online', value: 'event_type:Virtual-Event' },
+  { label: "Today", value: "date:today" },
+  { label: "This week", value: "date:week" },
+  { label: "This month", value: "date:month" },
+  { label: "Online", value: "event_type:Virtual-Event" },
 ];
 
 export default function EventsScreen() {
@@ -83,20 +102,53 @@ export default function EventsScreen() {
   const [loading, setLoading] = useState(true);
   const [locationLoading, setLocationLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [filter, setFilter] = useState('date:week');
+  const [filter, setFilter] = useState("date:week");
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [eventLocation, setEventLocation] = useState(FALLBACK_LOCATION);
   const [eventCoordinates, setEventCoordinates] = useState(FALLBACK_COORDS);
   const [createOpen, setCreateOpen] = useState(false);
   const [savingEvent, setSavingEvent] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
-  const [newTitle, setNewTitle] = useState('');
-  const [newWhen, setNewWhen] = useState('');
-  const [newAddress, setNewAddress] = useState('');
-  const [newDescription, setNewDescription] = useState('');
+  const [newTitle, setNewTitle] = useState("");
+  const [newWhen, setNewWhen] = useState("");
+  const [newAddress, setNewAddress] = useState("");
+  const [newDescription, setNewDescription] = useState("");
   const [newThumbnail, setNewThumbnail] = useState<string | null>(null);
   const [newTags, setNewTags] = useState<string[]>([]);
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
+  const [currentProfile, setCurrentProfile] = useState<UserProfile | null>(
+    null
+  );
+
+  const currentUser = auth.currentUser;
+
+  useEffect(() => {
+    const fetchCurrentProfile = async () => {
+      if (!currentUser) {
+        setCurrentProfile(null);
+        return;
+      }
+
+      try {
+        const response = await fetch(`${API_BASE}/api/users/${currentUser.uid}`);
+        if (response.status === 404) {
+          setCurrentProfile(null);
+          return;
+        }
+        if (!response.ok) {
+          throw new Error(`Profile request failed with status ${response.status}`);
+        }
+
+        const data = (await response.json()) as UserProfile;
+        setCurrentProfile(data);
+      } catch (profileError) {
+        console.error(profileError);
+        setCurrentProfile(null);
+      }
+    };
+
+    fetchCurrentProfile();
+  }, [currentUser]);
 
   useEffect(() => {
     const resolveUserLocation = async () => {
@@ -116,7 +168,7 @@ export default function EventsScreen() {
             accuracy: Location.Accuracy.Balanced,
           }),
           8000,
-          'Location lookup timed out.'
+          "Location lookup timed out."
         );
         setEventCoordinates({
           latitude: currentPosition.coords.latitude,
@@ -126,7 +178,7 @@ export default function EventsScreen() {
         const [place] = await withTimeout(
           Location.reverseGeocodeAsync(currentPosition.coords),
           8000,
-          'Reverse geocoding timed out.'
+          "Reverse geocoding timed out."
         );
         const city = place?.city ?? place?.subregion ?? place?.district;
         const region = place?.region;
@@ -161,7 +213,7 @@ export default function EventsScreen() {
         const params = new URLSearchParams({
           lat: String(eventCoordinates.latitude),
           lng: String(eventCoordinates.longitude),
-          radius: '25000',
+          radius: "25000",
         });
         const eventsUrl = `${API_BASE}/api/events?${params.toString()}`;
         console.log(`Fetching events from ${eventsUrl}`);
@@ -169,18 +221,22 @@ export default function EventsScreen() {
         const response = await withTimeout(
           fetch(eventsUrl),
           15000,
-          'Events request timed out.'
+          "Events request timed out."
         );
 
         if (!response.ok) {
-          throw new Error(`Events request failed with status ${response.status}`);
+          throw new Error(
+            `Events request failed with status ${response.status}`
+          );
         }
 
         const data = (await response.json()) as Event[];
         setEvents(data);
       } catch (eventError) {
         console.error(eventError);
-        setError(`Could not load events from ${API_BASE}. Check that the backend is running.`);
+        setError(
+          `Could not load events from ${API_BASE}. Check that the backend is running.`
+        );
       } finally {
         setLoading(false);
       }
@@ -197,10 +253,10 @@ export default function EventsScreen() {
   ]);
 
   const resetCreateForm = () => {
-    setNewTitle('');
-    setNewWhen('');
-    setNewAddress('');
-    setNewDescription('');
+    setNewTitle("");
+    setNewWhen("");
+    setNewAddress("");
+    setNewDescription("");
     setNewThumbnail(null);
     setNewTags([]);
   };
@@ -217,7 +273,10 @@ export default function EventsScreen() {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
     if (status !== ImagePicker.PermissionStatus.GRANTED) {
-      Alert.alert('Photo access needed', 'Allow photo access to add an event thumbnail.');
+      Alert.alert(
+        "Photo access needed",
+        "Allow photo access to add an event thumbnail."
+      );
       return;
     }
 
@@ -225,7 +284,7 @@ export default function EventsScreen() {
       allowsEditing: true,
       aspect: [4, 3],
       base64: true,
-      mediaTypes: ['images'],
+      mediaTypes: ["images"],
       quality: 0.45,
     });
 
@@ -235,13 +294,15 @@ export default function EventsScreen() {
 
     const asset = result.assets[0];
     setNewThumbnail(
-      asset.base64 ? `data:${asset.mimeType ?? 'image/jpeg'};base64,${asset.base64}` : asset.uri
+      asset.base64
+        ? `data:${asset.mimeType ?? "image/jpeg"};base64,${asset.base64}`
+        : asset.uri
     );
   };
 
   const createEvent = async () => {
     if (!newTitle.trim() || !newWhen.trim() || !newAddress.trim()) {
-      Alert.alert('Missing fields', 'Please add a title, time, and address.');
+      Alert.alert("Missing fields", "Please add a title, time, and address.");
       return;
     }
 
@@ -252,14 +313,17 @@ export default function EventsScreen() {
       const eventCoords = geocodedAddresses[0];
 
       if (!eventCoords) {
-        Alert.alert('Address not found', 'Please enter a more specific address.');
+        Alert.alert(
+          "Address not found",
+          "Please enter a more specific address."
+        );
         return;
       }
 
       const response = await fetch(`${API_BASE}/api/events`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           title: newTitle.trim(),
@@ -271,8 +335,9 @@ export default function EventsScreen() {
           description: newDescription.trim() || null,
           thumbnail: newThumbnail,
           tags: newTags,
+          author: currentUser?.uid ?? null,
           location: {
-            type: 'Point',
+            type: "Point",
             coordinates: [eventCoords.longitude, eventCoords.latitude],
           },
         }),
@@ -288,7 +353,10 @@ export default function EventsScreen() {
       setCreateOpen(false);
     } catch (createError) {
       console.error(createError);
-      Alert.alert('Could not save event', 'Check that the backend is running, then try again.');
+      Alert.alert(
+        "Could not save event",
+        "Check that the backend is running, then try again."
+      );
     } finally {
       setSavingEvent(false);
     }
@@ -318,14 +386,21 @@ export default function EventsScreen() {
           <TouchableOpacity
             activeOpacity={0.85}
             onPress={() => setCreateOpen(true)}
-            style={styles.addButton}>
+            style={styles.addButton}
+          >
             <Text style={styles.addButtonText}>Add</Text>
           </TouchableOpacity>
         </View>
-        <Text style={styles.subheading}>Showing events around {eventLocation}.</Text>
+        <Text style={styles.subheading}>
+          Showing events around {eventLocation}.
+        </Text>
       </View>
 
-      <Modal animationType="slide" onRequestClose={() => setCreateOpen(false)} visible={createOpen}>
+      <Modal
+        animationType="slide"
+        onRequestClose={() => setCreateOpen(false)}
+        visible={createOpen}
+      >
         <SafeAreaView style={styles.modalSafe}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>New Event</Text>
@@ -380,12 +455,23 @@ export default function EventsScreen() {
 
             <View style={styles.fieldGroup}>
               <Text style={styles.label}>Thumbnail</Text>
-              <TouchableOpacity activeOpacity={0.85} onPress={pickThumbnail} style={styles.photoButton}>
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={pickThumbnail}
+                style={styles.photoButton}
+              >
                 <Text style={styles.photoButtonText}>
-                  {newThumbnail ? 'Change thumbnail photo' : 'Add thumbnail photo'}
+                  {newThumbnail
+                    ? "Change thumbnail photo"
+                    : "Add thumbnail photo"}
                 </Text>
               </TouchableOpacity>
-              {newThumbnail && <Image source={{ uri: newThumbnail }} style={styles.photoPreview} />}
+              {newThumbnail && (
+                <Image
+                  source={{ uri: newThumbnail }}
+                  style={styles.photoPreview}
+                />
+              )}
             </View>
 
             <View style={styles.fieldGroup}>
@@ -399,8 +485,17 @@ export default function EventsScreen() {
                       activeOpacity={0.8}
                       key={tag}
                       onPress={() => toggleNewTag(tag)}
-                      style={[styles.tagOption, selected && styles.tagOptionSelected]}>
-                      <Text style={[styles.tagOptionText, selected && styles.tagOptionTextSelected]}>
+                      style={[
+                        styles.tagOption,
+                        selected && styles.tagOptionSelected,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.tagOptionText,
+                          selected && styles.tagOptionTextSelected,
+                        ]}
+                      >
                         {tag}
                       </Text>
                     </TouchableOpacity>
@@ -413,14 +508,21 @@ export default function EventsScreen() {
               <TouchableOpacity
                 disabled={savingEvent}
                 onPress={createEvent}
-                style={[styles.createButton, savingEvent && styles.createButtonDisabled]}>
-                <Text style={styles.createButtonText}>{savingEvent ? 'Creating' : 'Create'}</Text>
+                style={[
+                  styles.createButton,
+                  savingEvent && styles.createButtonDisabled,
+                ]}
+              >
+                <Text style={styles.createButtonText}>
+                  {savingEvent ? "Creating" : "Create"}
+                </Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 disabled={savingEvent}
                 onPress={() => setCreateOpen(false)}
-                style={styles.cancelButton}>
+                style={styles.cancelButton}
+              >
                 <Text style={styles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
             </View>
@@ -431,7 +533,8 @@ export default function EventsScreen() {
       <Modal
         animationType="slide"
         onRequestClose={() => setSelectedEvent(null)}
-        visible={selectedEvent !== null}>
+        visible={selectedEvent !== null}
+      >
         <SafeAreaView style={styles.modalSafe}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Event Details</Text>
@@ -440,7 +543,10 @@ export default function EventsScreen() {
           {selectedEvent && (
             <ScrollView contentContainerStyle={styles.detailContent}>
               {selectedEvent.thumbnail ? (
-                <Image source={{ uri: selectedEvent.thumbnail }} style={styles.detailImage} />
+                <Image
+                  source={{ uri: selectedEvent.thumbnail }}
+                  style={styles.detailImage}
+                />
               ) : (
                 <View style={styles.detailImagePlaceholder}>
                   <Text style={styles.detailImagePlaceholderText}>Event</Text>
@@ -450,10 +556,14 @@ export default function EventsScreen() {
               <View style={styles.detailBody}>
                 <Text style={styles.detailTitle}>{selectedEvent.title}</Text>
                 {!!selectedEvent.date?.when && (
-                  <Text style={styles.detailWhen}>{selectedEvent.date.when}</Text>
+                  <Text style={styles.detailWhen}>
+                    {selectedEvent.date.when}
+                  </Text>
                 )}
                 {!!selectedEvent.address?.length && (
-                  <Text style={styles.detailAddress}>{selectedEvent.address.join(', ')}</Text>
+                  <Text style={styles.detailAddress}>
+                    {selectedEvent.address.join(", ")}
+                  </Text>
                 )}
                 {!!selectedEvent.tags?.length && (
                   <View style={styles.detailTags}>
@@ -465,23 +575,133 @@ export default function EventsScreen() {
                   </View>
                 )}
                 <Text style={styles.detailDescription}>
-                  {selectedEvent.description || 'No description has been added for this event.'}
+                  {selectedEvent.description ||
+                    "No description has been added for this event."}
                 </Text>
+              </View>
+
+              {/* Attendees section */}
+              <View style={styles.attendeesSection}>
+                <Text style={styles.attendeesSectionTitle}>
+                  {selectedEvent.attendees?.length ?? 0} Going
+                </Text>
+
+                {/* RSVP button */}
+                {(() => {
+                  const currentUid = currentUser?.uid;
+                  const isAttending = selectedEvent.attendees?.some(
+                    (a) => a.uid === currentUid
+                  );
+
+                  const handleRsvp = async () => {
+                    if (!currentUid || !selectedEvent.id) return;
+                    const displayName =
+                      currentProfile?.display_name ||
+                      currentUser?.displayName ||
+                      currentUser?.email?.split("@")[0] ||
+                      "Anonymous";
+
+                    if (isAttending) {
+                      const res = await fetch(
+                        `${API_BASE}/api/events/${selectedEvent.id}/rsvp/${currentUid}`,
+                        {
+                          method: "DELETE",
+                        }
+                      );
+                      if (res.ok) {
+                        const updated = (await res.json()) as Event;
+                        setSelectedEvent(updated);
+                        setEvents((prev) =>
+                          prev.map((e) => (e.id === updated.id ? updated : e))
+                        );
+                      }
+                    } else {
+                      const res = await fetch(
+                        `${API_BASE}/api/events/${selectedEvent.id}/rsvp`,
+                        {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({
+                            uid: currentUid,
+                            display_name: displayName,
+                            photo: currentProfile?.photo ?? currentUser?.photoURL,
+                          }),
+                        }
+                      );
+                      if (res.ok) {
+                        const updated = (await res.json()) as Event;
+                        setSelectedEvent(updated);
+                        setEvents((prev) =>
+                          prev.map((e) => (e.id === updated.id ? updated : e))
+                        );
+                      }
+                    }
+                  };
+
+                  return (
+                    <TouchableOpacity
+                      onPress={handleRsvp}
+                      style={[
+                        styles.rsvpButton,
+                        isAttending && styles.rsvpButtonActive,
+                      ]}
+                      activeOpacity={0.85}
+                    >
+                      <Text
+                        style={[
+                          styles.rsvpButtonText,
+                          isAttending && styles.rsvpButtonTextActive,
+                        ]}
+                      >
+                        {isAttending ? "✓ I'm going" : "RSVP"}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })()}
+
+                {/* Attendee list */}
+                {!!selectedEvent.attendees?.length && (
+                  <View style={styles.attendeeList}>
+                    {selectedEvent.attendees.map((a) => (
+                      <View key={a.uid} style={styles.attendeeRow}>
+                        {a.photo ? (
+                          <Image
+                            source={{ uri: a.photo }}
+                            style={styles.attendeeAvatar}
+                          />
+                        ) : (
+                          <View style={styles.attendeeAvatarPlaceholder}>
+                            <Text style={styles.attendeeAvatarText}>
+                              {a.display_name?.[0] ?? "?"}
+                            </Text>
+                          </View>
+                        )}
+                        <Text style={styles.attendeeName}>
+                          {a.display_name ?? "Anonymous"}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
               </View>
 
               {!!selectedEvent.link && (
                 <TouchableOpacity
                   activeOpacity={0.85}
                   onPress={() => openEvent(selectedEvent.link)}
-                  style={styles.detailLinkButton}>
-                  <Text style={styles.detailLinkButtonText}>Open event link</Text>
+                  style={styles.detailLinkButton}
+                >
+                  <Text style={styles.detailLinkButtonText}>
+                    Open event link
+                  </Text>
                 </TouchableOpacity>
               )}
 
               <TouchableOpacity
                 activeOpacity={0.85}
                 onPress={() => setSelectedEvent(null)}
-                style={styles.detailCloseButton}>
+                style={styles.detailCloseButton}
+              >
                 <Text style={styles.detailCloseButtonText}>Close</Text>
               </TouchableOpacity>
             </ScrollView>
@@ -495,8 +715,14 @@ export default function EventsScreen() {
             activeOpacity={0.8}
             key={item.value}
             onPress={() => setFilter(item.value)}
-            style={[styles.chip, filter === item.value && styles.chipActive]}>
-            <Text style={[styles.chipText, filter === item.value && styles.chipTextActive]}>
+            style={[styles.chip, filter === item.value && styles.chipActive]}
+          >
+            <Text
+              style={[
+                styles.chipText,
+                filter === item.value && styles.chipTextActive,
+              ]}
+            >
               {item.label}
             </Text>
           </TouchableOpacity>
@@ -507,12 +733,22 @@ export default function EventsScreen() {
         contentContainerStyle={styles.tagFilterContent}
         horizontal
         showsHorizontalScrollIndicator={false}
-        style={styles.tagFilterRow}>
+        style={styles.tagFilterRow}
+      >
         <TouchableOpacity
           activeOpacity={0.8}
           onPress={() => setSelectedTag(null)}
-          style={[styles.filterTag, selectedTag === null && styles.filterTagActive]}>
-          <Text style={[styles.filterTagText, selectedTag === null && styles.filterTagTextActive]}>
+          style={[
+            styles.filterTag,
+            selectedTag === null && styles.filterTagActive,
+          ]}
+        >
+          <Text
+            style={[
+              styles.filterTagText,
+              selectedTag === null && styles.filterTagTextActive,
+            ]}
+          >
             All
           </Text>
         </TouchableOpacity>
@@ -522,8 +758,17 @@ export default function EventsScreen() {
             activeOpacity={0.8}
             key={tag}
             onPress={() => setSelectedTag(tag)}
-            style={[styles.filterTag, selectedTag === tag && styles.filterTagActive]}>
-            <Text style={[styles.filterTagText, selectedTag === tag && styles.filterTagTextActive]}>
+            style={[
+              styles.filterTag,
+              selectedTag === tag && styles.filterTagActive,
+            ]}
+          >
+            <Text
+              style={[
+                styles.filterTagText,
+                selectedTag === tag && styles.filterTagTextActive,
+              ]}
+            >
               {tag}
             </Text>
           </TouchableOpacity>
@@ -539,7 +784,8 @@ export default function EventsScreen() {
           <TouchableOpacity
             activeOpacity={0.85}
             onPress={() => setRefreshKey((key) => key + 1)}
-            style={styles.retryButton}>
+            style={styles.retryButton}
+          >
             <Text style={styles.retryButtonText}>Try again</Text>
           </TouchableOpacity>
         </View>
@@ -551,14 +797,17 @@ export default function EventsScreen() {
           ListEmptyComponent={
             <View style={styles.messageBox}>
               <Text style={styles.messageTitle}>No events found</Text>
-              <Text style={styles.messageText}>Try another date or tag filter.</Text>
+              <Text style={styles.messageText}>
+                Try another date or tag filter.
+              </Text>
             </View>
           }
           renderItem={({ item }) => (
             <TouchableOpacity
               activeOpacity={0.85}
               onPress={() => setSelectedEvent(item)}
-              style={styles.card}>
+              style={styles.card}
+            >
               {item.thumbnail ? (
                 <Image source={{ uri: item.thumbnail }} style={styles.thumb} />
               ) : (
@@ -571,10 +820,12 @@ export default function EventsScreen() {
                 <Text numberOfLines={2} style={styles.title}>
                   {item.title}
                 </Text>
-                {!!item.date?.when && <Text style={styles.when}>{item.date.when}</Text>}
+                {!!item.date?.when && (
+                  <Text style={styles.when}>{item.date.when}</Text>
+                )}
                 {!!item.address?.length && (
                   <Text numberOfLines={1} style={styles.address}>
-                    {item.address.join(', ')}
+                    {item.address.join(", ")}
                   </Text>
                 )}
                 {!!item.description && (
@@ -601,8 +852,67 @@ export default function EventsScreen() {
 }
 
 const styles = StyleSheet.create({
+  attendeesSection: {
+    gap: 12,
+  },
+  attendeesSectionTitle: {
+    color: "#111827",
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  rsvpButton: {
+    alignItems: "center",
+    backgroundColor: "#fff",
+    borderColor: "#6366F1",
+    borderRadius: 12,
+    borderWidth: 1.5,
+    minHeight: 48,
+    justifyContent: "center",
+  },
+  rsvpButtonActive: {
+    backgroundColor: "#6366F1",
+  },
+  rsvpButtonText: {
+    color: "#6366F1",
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  rsvpButtonTextActive: {
+    color: "#fff",
+  },
+  attendeeList: {
+    gap: 10,
+  },
+  attendeeRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 10,
+  },
+  attendeeAvatar: {
+    borderRadius: 16,
+    height: 32,
+    width: 32,
+  },
+  attendeeAvatarPlaceholder: {
+    alignItems: "center",
+    backgroundColor: "#EEF2FF",
+    borderRadius: 16,
+    height: 32,
+    justifyContent: "center",
+    width: 32,
+  },
+  attendeeAvatarText: {
+    color: "#6366F1",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  attendeeName: {
+    color: "#374151",
+    fontSize: 14,
+    fontWeight: "500",
+  },
   safe: {
-    backgroundColor: '#F9FAFB',
+    backgroundColor: "#F9FAFB",
     flex: 1,
   },
   header: {
@@ -611,48 +921,48 @@ const styles = StyleSheet.create({
     paddingTop: 12,
   },
   headerTop: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
   },
   heading: {
-    color: '#111827',
+    color: "#111827",
     fontSize: 28,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   addButton: {
-    backgroundColor: '#6366F1',
+    backgroundColor: "#6366F1",
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 8,
   },
   addButtonText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 14,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   subheading: {
-    color: '#6B7280',
+    color: "#6B7280",
     fontSize: 14,
     marginTop: 4,
   },
   modalSafe: {
-    backgroundColor: '#F9FAFB',
+    backgroundColor: "#F9FAFB",
     flex: 1,
   },
   modalHeader: {
-    alignItems: 'center',
-    borderBottomColor: '#E5E7EB',
+    alignItems: "center",
+    borderBottomColor: "#E5E7EB",
     borderBottomWidth: 1,
-    flexDirection: 'row',
-    justifyContent: 'center',
+    flexDirection: "row",
+    justifyContent: "center",
     paddingHorizontal: 16,
     paddingVertical: 14,
   },
   modalTitle: {
-    color: '#111827',
+    color: "#111827",
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   form: {
     gap: 16,
@@ -662,16 +972,16 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   label: {
-    color: '#374151',
+    color: "#374151",
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   input: {
-    backgroundColor: '#fff',
-    borderColor: '#E5E7EB',
+    backgroundColor: "#fff",
+    borderColor: "#E5E7EB",
     borderRadius: 12,
     borderWidth: 1.5,
-    color: '#111827',
+    color: "#111827",
     fontSize: 15,
     minHeight: 48,
     paddingHorizontal: 14,
@@ -681,232 +991,232 @@ const styles = StyleSheet.create({
     minHeight: 110,
   },
   photoButton: {
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    borderColor: '#E5E7EB',
+    alignItems: "center",
+    backgroundColor: "#fff",
+    borderColor: "#E5E7EB",
     borderRadius: 12,
     borderWidth: 1.5,
     minHeight: 48,
-    justifyContent: 'center',
+    justifyContent: "center",
     paddingHorizontal: 14,
   },
   photoButtonText: {
-    color: '#6366F1',
+    color: "#6366F1",
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   photoPreview: {
-    backgroundColor: '#E5E7EB',
+    backgroundColor: "#E5E7EB",
     borderRadius: 12,
     height: 150,
-    width: '100%',
+    width: "100%",
   },
   tagPicker: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 8,
   },
   tagOption: {
-    backgroundColor: '#fff',
-    borderColor: '#E5E7EB',
+    backgroundColor: "#fff",
+    borderColor: "#E5E7EB",
     borderRadius: 16,
     borderWidth: 1.5,
     paddingHorizontal: 12,
     paddingVertical: 7,
   },
   tagOptionSelected: {
-    backgroundColor: '#6366F1',
-    borderColor: '#6366F1',
+    backgroundColor: "#6366F1",
+    borderColor: "#6366F1",
   },
   tagOptionText: {
-    color: '#374151',
+    color: "#374151",
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   tagOptionTextSelected: {
-    color: '#fff',
+    color: "#fff",
   },
   formActions: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 10,
   },
   createButton: {
-    alignItems: 'center',
-    backgroundColor: '#6366F1',
+    alignItems: "center",
+    backgroundColor: "#6366F1",
     borderRadius: 12,
     flex: 1,
     minHeight: 48,
-    justifyContent: 'center',
+    justifyContent: "center",
   },
   createButtonDisabled: {
     opacity: 0.6,
   },
   createButtonText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   cancelButton: {
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    borderColor: '#E5E7EB',
+    alignItems: "center",
+    backgroundColor: "#fff",
+    borderColor: "#E5E7EB",
     borderRadius: 12,
     borderWidth: 1.5,
     flex: 1,
     minHeight: 48,
-    justifyContent: 'center',
+    justifyContent: "center",
   },
   cancelButtonText: {
-    color: '#374151',
+    color: "#374151",
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   detailContent: {
     padding: 16,
     gap: 16,
   },
   detailImage: {
-    backgroundColor: '#E5E7EB',
+    backgroundColor: "#E5E7EB",
     borderRadius: 14,
     height: 220,
-    width: '100%',
+    width: "100%",
   },
   detailImagePlaceholder: {
-    alignItems: 'center',
-    backgroundColor: '#EEF2FF',
+    alignItems: "center",
+    backgroundColor: "#EEF2FF",
     borderRadius: 14,
     height: 220,
-    justifyContent: 'center',
-    width: '100%',
+    justifyContent: "center",
+    width: "100%",
   },
   detailImagePlaceholderText: {
-    color: '#6366F1',
+    color: "#6366F1",
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   detailBody: {
     gap: 8,
   },
   detailTitle: {
-    color: '#111827',
+    color: "#111827",
     fontSize: 24,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   detailWhen: {
-    color: '#6366F1',
+    color: "#6366F1",
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   detailAddress: {
-    color: '#6B7280',
+    color: "#6B7280",
     fontSize: 14,
   },
   detailDescription: {
-    color: '#374151',
+    color: "#374151",
     fontSize: 15,
     lineHeight: 22,
     marginTop: 6,
   },
   detailTags: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 8,
     marginTop: 4,
   },
   tagPill: {
-    backgroundColor: '#EEF2FF',
+    backgroundColor: "#EEF2FF",
     borderRadius: 14,
     paddingHorizontal: 10,
     paddingVertical: 5,
   },
   tagPillText: {
-    color: '#6366F1',
+    color: "#6366F1",
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   detailLinkButton: {
-    alignItems: 'center',
-    backgroundColor: '#6366F1',
+    alignItems: "center",
+    backgroundColor: "#6366F1",
     borderRadius: 12,
     minHeight: 48,
-    justifyContent: 'center',
+    justifyContent: "center",
   },
   detailLinkButtonText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   detailCloseButton: {
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    borderColor: '#E5E7EB',
+    alignItems: "center",
+    backgroundColor: "#fff",
+    borderColor: "#E5E7EB",
     borderRadius: 12,
     borderWidth: 1.5,
     minHeight: 48,
-    justifyContent: 'center',
+    justifyContent: "center",
   },
   detailCloseButtonText: {
-    color: '#374151',
+    color: "#374151",
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   chips: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 8,
     paddingHorizontal: 16,
     paddingTop: 16,
     paddingBottom: 10,
   },
   chip: {
-    backgroundColor: '#fff',
-    borderColor: '#E5E7EB',
+    backgroundColor: "#fff",
+    borderColor: "#E5E7EB",
     borderRadius: 20,
     borderWidth: 1.5,
     paddingHorizontal: 14,
     paddingVertical: 7,
   },
   chipActive: {
-    backgroundColor: '#6366F1',
-    borderColor: '#6366F1',
+    backgroundColor: "#6366F1",
+    borderColor: "#6366F1",
   },
   chipText: {
-    color: '#374151',
+    color: "#374151",
     fontSize: 13,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   chipTextActive: {
-    color: '#fff',
+    color: "#fff",
   },
   tagFilterRow: {
     flexGrow: 0,
     height: 48,
   },
   tagFilterContent: {
-    alignItems: 'center',
+    alignItems: "center",
     gap: 8,
     paddingHorizontal: 16,
     paddingBottom: 6,
   },
   filterTag: {
-    backgroundColor: '#fff',
-    borderColor: '#E5E7EB',
+    backgroundColor: "#fff",
+    borderColor: "#E5E7EB",
     borderRadius: 16,
     borderWidth: 1.5,
     paddingHorizontal: 12,
     paddingVertical: 7,
   },
   filterTagActive: {
-    backgroundColor: '#111827',
-    borderColor: '#111827',
+    backgroundColor: "#111827",
+    borderColor: "#111827",
   },
   filterTagText: {
-    color: '#374151',
+    color: "#374151",
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   filterTagTextActive: {
-    color: '#fff',
+    color: "#fff",
   },
   loader: {
     marginTop: 40,
@@ -917,35 +1227,35 @@ const styles = StyleSheet.create({
     paddingTop: 0,
   },
   card: {
-    backgroundColor: '#fff',
-    borderColor: '#F3F4F6',
+    backgroundColor: "#fff",
+    borderColor: "#F3F4F6",
     borderRadius: 14,
     borderWidth: 1,
     elevation: 2,
-    flexDirection: 'row',
-    overflow: 'hidden',
-    shadowColor: '#000',
+    flexDirection: "row",
+    overflow: "hidden",
+    shadowColor: "#000",
     shadowOpacity: 0.05,
     shadowRadius: 8,
   },
   thumb: {
-    backgroundColor: '#E5E7EB',
-    alignSelf: 'stretch',
+    backgroundColor: "#E5E7EB",
+    alignSelf: "stretch",
     minHeight: 112,
     width: 90,
   },
   thumbPlaceholder: {
-    alignItems: 'center',
-    backgroundColor: '#EEF2FF',
-    alignSelf: 'stretch',
-    justifyContent: 'center',
+    alignItems: "center",
+    backgroundColor: "#EEF2FF",
+    alignSelf: "stretch",
+    justifyContent: "center",
     minHeight: 112,
     width: 90,
   },
   thumbPlaceholderText: {
-    color: '#6366F1',
+    color: "#6366F1",
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   info: {
     flex: 1,
@@ -953,70 +1263,70 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   title: {
-    color: '#111827',
+    color: "#111827",
     fontSize: 15,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   when: {
-    color: '#6366F1',
+    color: "#6366F1",
     fontSize: 12,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   address: {
-    color: '#6B7280',
+    color: "#6B7280",
     fontSize: 12,
   },
   desc: {
-    color: '#9CA3AF',
+    color: "#9CA3AF",
     fontSize: 12,
     marginTop: 2,
   },
   cardTags: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 5,
     marginTop: 4,
   },
   smallTagPill: {
-    backgroundColor: '#EEF2FF',
+    backgroundColor: "#EEF2FF",
     borderRadius: 12,
     paddingHorizontal: 8,
     paddingVertical: 3,
   },
   smallTagPillText: {
-    color: '#6366F1',
+    color: "#6366F1",
     fontSize: 10,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   messageBox: {
     margin: 16,
     paddingVertical: 28,
   },
   messageTitle: {
-    color: '#111827',
+    color: "#111827",
     fontSize: 16,
-    fontWeight: '700',
-    textAlign: 'center',
+    fontWeight: "700",
+    textAlign: "center",
   },
   messageText: {
-    color: '#6B7280',
+    color: "#6B7280",
     fontSize: 14,
     marginTop: 6,
-    textAlign: 'center',
+    textAlign: "center",
   },
   retryButton: {
-    alignItems: 'center',
-    alignSelf: 'center',
-    backgroundColor: '#111827',
+    alignItems: "center",
+    alignSelf: "center",
+    backgroundColor: "#111827",
     borderRadius: 12,
     marginTop: 16,
     minHeight: 44,
-    justifyContent: 'center',
+    justifyContent: "center",
     paddingHorizontal: 18,
   },
   retryButtonText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 14,
-    fontWeight: '700',
+    fontWeight: "700",
   },
 });

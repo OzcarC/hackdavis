@@ -1,5 +1,5 @@
 import * as ImagePicker from 'expo-image-picker';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -14,6 +14,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 
 import { API_BASE } from '@/constants/api';
 import { auth } from '../../firebase';
@@ -36,11 +37,13 @@ type Event = {
   thumbnail?: string | null;
   description?: string | null;
   tags?: string[];
+  author?: string | null;
 };
 
 export default function ProfileScreen() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [postedEvents, setPostedEvents] = useState<Event[]>([]);
+  const [hostedEvents, setHostedEvents] = useState<Event[]>([]);
+  const [attendingEvents, setAttendingEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [eventsLoading, setEventsLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -71,22 +74,38 @@ export default function ProfileScreen() {
     fetchProfile();
   }, [user]);
 
-  useEffect(() => {
-    const fetchPostedEvents = async () => {
-      if (!user) { setEventsLoading(false); return; }
-      try {
-        const response = await fetch(`${API_BASE}/api/events?author=${user.uid}`);
-        if (!response.ok) throw new Error(`Status ${response.status}`);
-        const data = (await response.json()) as Event[];
-        setPostedEvents(data);
-      } catch (error) {
-        console.error('Could not load posted events:', error);
-      } finally {
-        setEventsLoading(false);
-      }
-    };
-    fetchPostedEvents();
+  const fetchProfileEvents = useCallback(async () => {
+    if (!user) {
+      setEventsLoading(false);
+      return;
+    }
+
+    setEventsLoading(true);
+    try {
+      const [hostedResponse, attendingResponse] = await Promise.all([
+        fetch(`${API_BASE}/api/events?author=${user.uid}`),
+        fetch(`${API_BASE}/api/events?attendee=${user.uid}`),
+      ]);
+
+      if (!hostedResponse.ok) throw new Error(`Hosted status ${hostedResponse.status}`);
+      if (!attendingResponse.ok) throw new Error(`Attending status ${attendingResponse.status}`);
+
+      const hosted = (await hostedResponse.json()) as Event[];
+      const attending = (await attendingResponse.json()) as Event[];
+      setHostedEvents(hosted);
+      setAttendingEvents(attending.filter((event) => event.author !== user.uid));
+    } catch (error) {
+      console.error('Could not load profile events:', error);
+    } finally {
+      setEventsLoading(false);
+    }
   }, [user]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchProfileEvents();
+    }, [fetchProfileEvents])
+  );
 
   const pickProfilePhoto = async () => {
     if (!user) { Alert.alert('Not signed in', 'Log in before adding a profile photo.'); return; }
@@ -150,6 +169,37 @@ export default function ProfileScreen() {
 
   const displayName = profile?.display_name || user?.displayName || user?.email?.split('@')[0] || 'You';
   const initials = displayName.charAt(0).toUpperCase();
+  const totalEvents = hostedEvents.length + attendingEvents.length;
+
+  const renderEventCard = (item: Event) => (
+    <View style={styles.eventCard}>
+      {item.thumbnail ? (
+        <Image source={{ uri: item.thumbnail }} style={styles.eventThumb} />
+      ) : (
+        <View style={styles.eventThumbPlaceholder}>
+          <Text style={styles.eventThumbPlaceholderText}>📅</Text>
+        </View>
+      )}
+      <View style={styles.eventInfo}>
+        <Text style={styles.eventTitle} numberOfLines={2}>{item.title}</Text>
+        {!!item.date?.when && (
+          <Text style={styles.eventWhen}>{item.date.when}</Text>
+        )}
+        {!!item.address?.length && (
+          <Text style={styles.eventAddress} numberOfLines={1}>{item.address.join(', ')}</Text>
+        )}
+        {!!item.tags?.length && (
+          <View style={styles.eventTags}>
+            {item.tags.slice(0, 3).map((tag) => (
+              <View key={tag} style={styles.tagPill}>
+                <Text style={styles.tagPillText}>{tag}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+      </View>
+    </View>
+  );
 
   if (loading) {
     return (
@@ -203,7 +253,7 @@ export default function ProfileScreen() {
       </Modal>
 
       <FlatList
-        data={postedEvents}
+        data={hostedEvents}
         keyExtractor={(item, i) => item.id ?? String(i)}
         contentContainerStyle={styles.listContainer}
         ListHeaderComponent={
@@ -241,14 +291,18 @@ export default function ProfileScreen() {
             {/* Stats row */}
             <View style={styles.statsRow}>
               <View style={styles.statItem}>
-                <Text style={styles.statNumber}>{postedEvents.length}</Text>
-                <Text style={styles.statLabel}>Events</Text>
+                <Text style={styles.statNumber}>{hostedEvents.length}</Text>
+                <Text style={styles.statLabel}>Hosting</Text>
+              </View>
+              <View style={styles.statItem}>
+                <Text style={styles.statNumber}>{attendingEvents.length}</Text>
+                <Text style={styles.statLabel}>Attending</Text>
               </View>
             </View>
 
             {/* Divider + section title */}
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>My Events</Text>
+              <Text style={styles.sectionTitle}>Hosting</Text>
             </View>
           </>
         }
@@ -258,40 +312,36 @@ export default function ProfileScreen() {
           ) : (
             <View style={styles.emptyBox}>
               <Text style={styles.emptyIcon}>🗓️</Text>
-              <Text style={styles.emptyTitle}>No events yet</Text>
-              <Text style={styles.emptyText}>Events you post will show up here.</Text>
+              <Text style={styles.emptyTitle}>No hosted events yet</Text>
+              <Text style={styles.emptyText}>Events you create will show up here.</Text>
             </View>
           )
         }
-        renderItem={({ item }) => (
-          <View style={styles.eventCard}>
-            {item.thumbnail ? (
-              <Image source={{ uri: item.thumbnail }} style={styles.eventThumb} />
+        renderItem={({ item }) => renderEventCard(item)}
+        ListFooterComponent={
+          <>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Attending</Text>
+            </View>
+            {eventsLoading ? (
+              totalEvents > 0 ? (
+                <ActivityIndicator color="#6366F1" style={{ marginTop: 16 }} />
+              ) : null
+            ) : attendingEvents.length > 0 ? (
+              attendingEvents.map((event, index) => (
+                <View key={event.id ?? `attending-${index}`}>
+                  {renderEventCard(event)}
+                </View>
+              ))
             ) : (
-              <View style={styles.eventThumbPlaceholder}>
-                <Text style={styles.eventThumbPlaceholderText}>📅</Text>
+              <View style={styles.emptyBox}>
+                <Text style={styles.emptyIcon}>🗓️</Text>
+                <Text style={styles.emptyTitle}>No RSVPs yet</Text>
+                <Text style={styles.emptyText}>Events you RSVP to will show up here.</Text>
               </View>
             )}
-            <View style={styles.eventInfo}>
-              <Text style={styles.eventTitle} numberOfLines={2}>{item.title}</Text>
-              {!!item.date?.when && (
-                <Text style={styles.eventWhen}>{item.date.when}</Text>
-              )}
-              {!!item.address?.length && (
-                <Text style={styles.eventAddress} numberOfLines={1}>{item.address.join(', ')}</Text>
-              )}
-              {!!item.tags?.length && (
-                <View style={styles.eventTags}>
-                  {item.tags.slice(0, 3).map((tag) => (
-                    <View key={tag} style={styles.tagPill}>
-                      <Text style={styles.tagPillText}>{tag}</Text>
-                    </View>
-                  ))}
-                </View>
-              )}
-            </View>
-          </View>
-        )}
+          </>
+        }
       />
     </SafeAreaView>
   );
