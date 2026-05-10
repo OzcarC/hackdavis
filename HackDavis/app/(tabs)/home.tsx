@@ -1,93 +1,261 @@
-import { Image } from 'expo-image';
-import { Link } from 'expo-router';
-import { Platform, StyleSheet } from 'react-native';
+import { useRouter } from 'expo-router';
+import React from 'react';
+import {
+  ActivityIndicator,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
+import { EventCard } from '@/components/event-card';
+import { fallbackEvents } from '@/constants/fallback-events';
+import { filterEventsByInterests, type Interest } from '@/constants/interests';
+import { palette } from '@/constants/palette';
+import { useEvents } from '@/hooks/use-events';
+
+// TODO: read from user profile once onboarding exists
+const userInterests: Interest[] = ['Chill', 'Gaming', 'Food'];
+
+const FOR_YOU_LIMIT = 5;
+const HAPPENING_LIMIT = 6;
 
 export default function HomeScreen() {
-  return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image source={require('@/assets/images/partial-react-logo.png')} style={styles.reactLogo} />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/home.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                destructive
-                icon="trash"
-                onPress={() => alert('Delete pressed')}
-                title="Delete"
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+  const router = useRouter();
+  const { events, loading, location } = useEvents();
 
-        <ThemedText>{`Tap the Explore tab to learn more about what's included in this starter app.`}</ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+  const displayEvents = events.length > 0 ? events : fallbackEvents;
+  const forYouAll = filterEventsByInterests(displayEvents, userInterests);
+  const forYouTop = forYouAll.slice(0, FOR_YOU_LIMIT);
+  const happeningTop = displayEvents.slice(0, HAPPENING_LIMIT);
+  const hasMoreHappening = displayEvents.length > HAPPENING_LIMIT;
+
+  const goToEvents = () => router.push('/(tabs)/events');
+
+  return (
+    <SafeAreaView style={styles.safe}>
+      <ScrollView contentContainerStyle={styles.scroll}>
+        <View style={styles.header}>
+          <Text style={styles.greeting}>Hey there</Text>
+          <Text style={styles.location}>Events around {location}</Text>
+        </View>
+
+        {loading ? (
+          <ActivityIndicator color={palette.coral} style={styles.loader} />
+        ) : (
+          <>
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <View style={styles.titleRow}>
+                  <View style={styles.accentBar} />
+                  <Text style={styles.sectionTitle}>For You</Text>
+                </View>
+                <Text style={styles.sectionSubtitle}>
+                  Based on {userInterests.join(' · ')}
+                </Text>
+              </View>
+
+              {forYouTop.length === 0 ? (
+                <View style={styles.emptyCard}>
+                  <Text style={styles.emptyTitle}>No matches yet</Text>
+                  <Text style={styles.emptyText}>
+                    No events match your interests right now. Browse all events below.
+                  </Text>
+                </View>
+              ) : (
+                <View style={styles.cardStack}>
+                  {forYouTop.map((event, index) => (
+                    <EventCard
+                      key={event.id ?? event.link ?? `for-you-${index}`}
+                      event={event}
+                      onPress={goToEvents}
+                    />
+                  ))}
+
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    onPress={goToEvents}
+                    style={styles.viewMoreButton}>
+                    <Text style={styles.viewMoreButtonText}>View more for you</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+
+            <View style={styles.section}>
+              <View style={styles.areaContainer}>
+                <View style={styles.sectionHeader}>
+                  <View style={styles.titleRow}>
+                    <View style={[styles.accentBar, styles.accentBarPeach]} />
+                    <Text style={styles.sectionTitle}>Happening in {location.split(',')[0]}</Text>
+                  </View>
+                  <Text style={styles.sectionSubtitle}>All events near you</Text>
+                </View>
+
+                <View style={styles.cardStack}>
+                  {happeningTop.map((event, index) => (
+                    <EventCard
+                      key={event.id ?? event.link ?? `area-${index}`}
+                      event={event}
+                      onPress={goToEvents}
+                    />
+                  ))}
+
+                  {hasMoreHappening && (
+                    <TouchableOpacity
+                      activeOpacity={0.85}
+                      onPress={goToEvents}
+                      style={styles.viewAllButton}>
+                      <Text style={styles.viewAllButtonText}>
+                        View all {displayEvents.length} events
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+            </View>
+          </>
+        )}
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
+  safe: {
+    backgroundColor: palette.bg,
+    flex: 1,
+  },
+  scroll: {
+    paddingBottom: 32,
+  },
+  header: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 4,
+  },
+  greeting: {
+    color: palette.textPrimary,
+    fontSize: 28,
+    fontWeight: '700',
+    letterSpacing: -0.5,
+  },
+  location: {
+    color: palette.textMuted,
+    fontSize: 14,
+    marginTop: 4,
+  },
+  loader: {
+    marginTop: 40,
+  },
+  messageBox: {
+    margin: 16,
+    paddingVertical: 28,
+  },
+  messageTitle: {
+    color: palette.textPrimary,
+    fontSize: 16,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  messageText: {
+    color: palette.textMuted,
+    fontSize: 14,
+    marginTop: 6,
+    textAlign: 'center',
+  },
+  section: {
+    paddingHorizontal: 16,
+    paddingTop: 20,
+  },
+  sectionHeader: {
+    marginBottom: 12,
+  },
+  titleRow: {
     alignItems: 'center',
     flexDirection: 'row',
-    gap: 8,
+    gap: 10,
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  accentBar: {
+    backgroundColor: palette.coral,
+    borderRadius: 2,
+    height: 18,
+    width: 4,
   },
-  reactLogo: {
-    bottom: 0,
-    height: 178,
-    left: 0,
-    position: 'absolute',
-    width: 290,
+  accentBarPeach: {
+    backgroundColor: palette.peach,
+  },
+  sectionTitle: {
+    color: palette.textPrimary,
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  sectionSubtitle: {
+    color: palette.textMuted,
+    fontSize: 13,
+    marginTop: 4,
+    marginLeft: 14,
+  },
+  cardStack: {
+    gap: 12,
+  },
+  viewMoreButton: {
+    alignItems: 'center',
+    backgroundColor: palette.coral,
+    borderRadius: 14,
+    minHeight: 48,
+    justifyContent: 'center',
+    marginTop: 4,
+  },
+  viewMoreButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+  },
+  viewAllButton: {
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+    borderColor: palette.peach,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    minHeight: 44,
+    justifyContent: 'center',
+    marginTop: 4,
+  },
+  viewAllButtonText: {
+    color: palette.peach,
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+  },
+  areaContainer: {
+    backgroundColor: palette.card,
+    borderColor: palette.border,
+    borderRadius: 18,
+    borderWidth: 1,
+    padding: 14,
+  },
+  emptyCard: {
+    alignItems: 'center',
+    backgroundColor: palette.card,
+    borderColor: palette.border,
+    borderRadius: 14,
+    borderWidth: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 24,
+  },
+  emptyTitle: {
+    color: palette.textPrimary,
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  emptyText: {
+    color: palette.textMuted,
+    fontSize: 13,
+    marginTop: 4,
+    textAlign: 'center',
   },
 });
