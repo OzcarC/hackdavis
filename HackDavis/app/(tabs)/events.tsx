@@ -18,6 +18,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { API_BASE } from '@/constants/api';
+import { colorForTag, palette } from '@/constants/palette';
 
 const FALLBACK_LOCATION = 'Davis, CA';
 const FALLBACK_COORDS = {
@@ -337,7 +338,7 @@ export default function EventsScreen() {
               <TextInput
                 onChangeText={setNewTitle}
                 placeholder="HackDavis meetup"
-                placeholderTextColor="#9CA3AF"
+                placeholderTextColor={palette.textSubtle}
                 style={styles.input}
                 value={newTitle}
               />
@@ -348,7 +349,7 @@ export default function EventsScreen() {
               <TextInput
                 onChangeText={setNewWhen}
                 placeholder="Sat, May 16, 2:00 PM"
-                placeholderTextColor="#9CA3AF"
+                placeholderTextColor={palette.textSubtle}
                 style={styles.input}
                 value={newWhen}
               />
@@ -359,7 +360,7 @@ export default function EventsScreen() {
               <TextInput
                 onChangeText={setNewAddress}
                 placeholder="1 Shields Ave, Davis, CA"
-                placeholderTextColor="#9CA3AF"
+                placeholderTextColor={palette.textSubtle}
                 style={styles.input}
                 value={newAddress}
               />
@@ -371,7 +372,7 @@ export default function EventsScreen() {
                 multiline
                 onChangeText={setNewDescription}
                 placeholder="Add a short description"
-                placeholderTextColor="#9CA3AF"
+                placeholderTextColor={palette.textSubtle}
                 style={[styles.input, styles.textArea]}
                 textAlignVertical="top"
                 value={newDescription}
@@ -458,7 +459,9 @@ export default function EventsScreen() {
                 {!!selectedEvent.tags?.length && (
                   <View style={styles.detailTags}>
                     {selectedEvent.tags.map((tag) => (
-                      <View key={tag} style={styles.tagPill}>
+                      <View
+                        key={tag}
+                        style={[styles.tagPill, { backgroundColor: colorForTag(tag) }]}>
                         <Text style={styles.tagPillText}>{tag}</Text>
                       </View>
                     ))}
@@ -531,7 +534,7 @@ export default function EventsScreen() {
       </ScrollView>
 
       {loading ? (
-        <ActivityIndicator color="#6366F1" style={styles.loader} />
+        <ActivityIndicator color={palette.coral} style={styles.loader} />
       ) : error ? (
         <View style={styles.messageBox}>
           <Text style={styles.messageTitle}>Unable to load events</Text>
@@ -585,7 +588,9 @@ export default function EventsScreen() {
                 {!!item.tags?.length && (
                   <View style={styles.cardTags}>
                     {item.tags.slice(0, 3).map((tag) => (
-                      <View key={tag} style={styles.smallTagPill}>
+                      <View
+                        key={tag}
+                        style={[styles.smallTagPill, { backgroundColor: colorForTag(tag) }]}>
                         <Text style={styles.smallTagPillText}>{tag}</Text>
                       </View>
                     ))}
@@ -602,7 +607,7 @@ export default function EventsScreen() {
 
 const styles = StyleSheet.create({
   safe: {
-    backgroundColor: '#F9FAFB',
+    backgroundColor: palette.bg,
     flex: 1,
   },
   header: {
@@ -616,12 +621,12 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   heading: {
-    color: '#111827',
+    color: palette.textPrimary,
     fontSize: 28,
     fontWeight: '700',
   },
   addButton: {
-    backgroundColor: '#6366F1',
+    backgroundColor: palette.coral,
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 8,
@@ -632,17 +637,17 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   subheading: {
-    color: '#6B7280',
+    color: palette.textMuted,
     fontSize: 14,
     marginTop: 4,
   },
   modalSafe: {
-    backgroundColor: '#F9FAFB',
+    backgroundColor: palette.bg,
     flex: 1,
   },
   modalHeader: {
     alignItems: 'center',
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: palette.border,
     borderBottomWidth: 1,
     flexDirection: 'row',
     justifyContent: 'center',
@@ -650,7 +655,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   modalTitle: {
-    color: '#111827',
+    color: palette.textPrimary,
     fontSize: 16,
     fontWeight: '700',
   },
@@ -662,16 +667,16 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   label: {
-    color: '#374151',
+    color: palette.textPrimary,
     fontSize: 13,
     fontWeight: '600',
   },
   input: {
-    backgroundColor: '#fff',
-    borderColor: '#E5E7EB',
+    backgroundColor: palette.card,
+    borderColor: palette.border,
     borderRadius: 12,
     borderWidth: 1.5,
-    color: '#111827',
+    color: palette.textPrimary,
     fontSize: 15,
     minHeight: 48,
     paddingHorizontal: 14,
@@ -682,8 +687,8 @@ const styles = StyleSheet.create({
   },
   photoButton: {
     alignItems: 'center',
-    backgroundColor: '#fff',
-    borderColor: '#E5E7EB',
+    backgroundColor: palette.card,
+    borderColor: palette.border,
     borderRadius: 12,
     borderWidth: 1.5,
     minHeight: 48,
@@ -691,12 +696,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   photoButtonText: {
-    color: '#6366F1',
+    color: palette.coral,
     fontSize: 15,
     fontWeight: '700',
   },
   photoPreview: {
-    backgroundColor: '#E5E7EB',
+    backgroundColor: palette.border,
     borderRadius: 12,
     height: 150,
     width: '100%',
@@ -707,19 +712,19 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   tagOption: {
-    backgroundColor: '#fff',
-    borderColor: '#E5E7EB',
+    backgroundColor: palette.card,
+    borderColor: palette.border,
     borderRadius: 16,
     borderWidth: 1.5,
     paddingHorizontal: 12,
     paddingVertical: 7,
   },
   tagOptionSelected: {
-    backgroundColor: '#6366F1',
-    borderColor: '#6366F1',
+    backgroundColor: palette.coral,
+    borderColor: palette.coral,
   },
   tagOptionText: {
-    color: '#374151',
+    color: palette.textPrimary,
     fontSize: 13,
     fontWeight: '600',
   },
@@ -732,7 +737,7 @@ const styles = StyleSheet.create({
   },
   createButton: {
     alignItems: 'center',
-    backgroundColor: '#6366F1',
+    backgroundColor: palette.coral,
     borderRadius: 12,
     flex: 1,
     minHeight: 48,
@@ -748,8 +753,8 @@ const styles = StyleSheet.create({
   },
   cancelButton: {
     alignItems: 'center',
-    backgroundColor: '#fff',
-    borderColor: '#E5E7EB',
+    backgroundColor: palette.card,
+    borderColor: palette.border,
     borderRadius: 12,
     borderWidth: 1.5,
     flex: 1,
@@ -757,7 +762,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   cancelButtonText: {
-    color: '#374151',
+    color: palette.textPrimary,
     fontSize: 15,
     fontWeight: '700',
   },
@@ -766,43 +771,44 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   detailImage: {
-    backgroundColor: '#E5E7EB',
+    backgroundColor: palette.border,
     borderRadius: 14,
     height: 220,
     width: '100%',
   },
   detailImagePlaceholder: {
     alignItems: 'center',
-    backgroundColor: '#EEF2FF',
+    backgroundColor: palette.coral,
     borderRadius: 14,
     height: 220,
     justifyContent: 'center',
     width: '100%',
   },
   detailImagePlaceholderText: {
-    color: '#6366F1',
+    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '700',
+    letterSpacing: 0.5,
   },
   detailBody: {
     gap: 8,
   },
   detailTitle: {
-    color: '#111827',
+    color: palette.textPrimary,
     fontSize: 24,
     fontWeight: '700',
   },
   detailWhen: {
-    color: '#6366F1',
+    color: palette.coral,
     fontSize: 15,
     fontWeight: '700',
   },
   detailAddress: {
-    color: '#6B7280',
+    color: palette.textMuted,
     fontSize: 14,
   },
   detailDescription: {
-    color: '#374151',
+    color: palette.textPrimary,
     fontSize: 15,
     lineHeight: 22,
     marginTop: 6,
@@ -814,19 +820,18 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   tagPill: {
-    backgroundColor: '#EEF2FF',
     borderRadius: 14,
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
     paddingVertical: 5,
   },
   tagPillText: {
-    color: '#6366F1',
+    color: '#FFFFFF',
     fontSize: 12,
     fontWeight: '700',
   },
   detailLinkButton: {
     alignItems: 'center',
-    backgroundColor: '#6366F1',
+    backgroundColor: palette.coral,
     borderRadius: 12,
     minHeight: 48,
     justifyContent: 'center',
@@ -838,15 +843,15 @@ const styles = StyleSheet.create({
   },
   detailCloseButton: {
     alignItems: 'center',
-    backgroundColor: '#fff',
-    borderColor: '#E5E7EB',
+    backgroundColor: palette.card,
+    borderColor: palette.border,
     borderRadius: 12,
     borderWidth: 1.5,
     minHeight: 48,
     justifyContent: 'center',
   },
   detailCloseButtonText: {
-    color: '#374151',
+    color: palette.textPrimary,
     fontSize: 15,
     fontWeight: '700',
   },
@@ -859,19 +864,19 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
   },
   chip: {
-    backgroundColor: '#fff',
-    borderColor: '#E5E7EB',
+    backgroundColor: palette.card,
+    borderColor: palette.border,
     borderRadius: 20,
     borderWidth: 1.5,
     paddingHorizontal: 14,
     paddingVertical: 7,
   },
   chipActive: {
-    backgroundColor: '#6366F1',
-    borderColor: '#6366F1',
+    backgroundColor: palette.coral,
+    borderColor: palette.coral,
   },
   chipText: {
-    color: '#374151',
+    color: palette.textPrimary,
     fontSize: 13,
     fontWeight: '500',
   },
@@ -889,19 +894,19 @@ const styles = StyleSheet.create({
     paddingBottom: 6,
   },
   filterTag: {
-    backgroundColor: '#fff',
-    borderColor: '#E5E7EB',
+    backgroundColor: palette.card,
+    borderColor: palette.border,
     borderRadius: 16,
     borderWidth: 1.5,
     paddingHorizontal: 12,
     paddingVertical: 7,
   },
   filterTagActive: {
-    backgroundColor: '#111827',
-    borderColor: '#111827',
+    backgroundColor: palette.navy,
+    borderColor: palette.navy,
   },
   filterTagText: {
-    color: '#374151',
+    color: palette.textPrimary,
     fontSize: 13,
     fontWeight: '600',
   },
@@ -917,8 +922,8 @@ const styles = StyleSheet.create({
     paddingTop: 0,
   },
   card: {
-    backgroundColor: '#fff',
-    borderColor: '#F3F4F6',
+    backgroundColor: palette.card,
+    borderColor: palette.border,
     borderRadius: 14,
     borderWidth: 1,
     elevation: 2,
@@ -929,23 +934,24 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
   },
   thumb: {
-    backgroundColor: '#E5E7EB',
+    backgroundColor: palette.border,
     alignSelf: 'stretch',
     minHeight: 112,
     width: 90,
   },
   thumbPlaceholder: {
     alignItems: 'center',
-    backgroundColor: '#EEF2FF',
+    backgroundColor: palette.coral,
     alignSelf: 'stretch',
     justifyContent: 'center',
     minHeight: 112,
     width: 90,
   },
   thumbPlaceholderText: {
-    color: '#6366F1',
+    color: '#FFFFFF',
     fontSize: 12,
     fontWeight: '700',
+    letterSpacing: 0.5,
   },
   info: {
     flex: 1,
@@ -953,21 +959,21 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   title: {
-    color: '#111827',
+    color: palette.textPrimary,
     fontSize: 15,
     fontWeight: '600',
   },
   when: {
-    color: '#6366F1',
+    color: palette.coral,
     fontSize: 12,
     fontWeight: '500',
   },
   address: {
-    color: '#6B7280',
+    color: palette.textMuted,
     fontSize: 12,
   },
   desc: {
-    color: '#9CA3AF',
+    color: palette.textSubtle,
     fontSize: 12,
     marginTop: 2,
   },
@@ -978,13 +984,12 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   smallTagPill: {
-    backgroundColor: '#EEF2FF',
     borderRadius: 12,
-    paddingHorizontal: 8,
+    paddingHorizontal: 10,
     paddingVertical: 3,
   },
   smallTagPillText: {
-    color: '#6366F1',
+    color: '#FFFFFF',
     fontSize: 10,
     fontWeight: '700',
   },
@@ -993,13 +998,13 @@ const styles = StyleSheet.create({
     paddingVertical: 28,
   },
   messageTitle: {
-    color: '#111827',
+    color: palette.textPrimary,
     fontSize: 16,
     fontWeight: '700',
     textAlign: 'center',
   },
   messageText: {
-    color: '#6B7280',
+    color: palette.textMuted,
     fontSize: 14,
     marginTop: 6,
     textAlign: 'center',
@@ -1007,7 +1012,7 @@ const styles = StyleSheet.create({
   retryButton: {
     alignItems: 'center',
     alignSelf: 'center',
-    backgroundColor: '#111827',
+    backgroundColor: palette.navy,
     borderRadius: 12,
     marginTop: 16,
     minHeight: 44,
