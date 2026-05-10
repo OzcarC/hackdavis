@@ -13,7 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { EventCard } from '@/components/event-card';
 import { fallbackEvents } from '@/constants/fallback-events';
 import { filterEventsByInterests, type Interest } from '@/constants/interests';
-import { palette } from '@/constants/palette';
+import { flatButton, palette } from '@/constants/palette';
 import { useEvents } from '@/hooks/use-events';
 
 // TODO: read from user profile once onboarding exists
@@ -47,72 +47,76 @@ export default function HomeScreen() {
         ) : (
           <>
             <View style={styles.section}>
-              <View style={styles.sectionHeader}>
-                <View style={styles.titleRow}>
-                  <View style={styles.accentBar} />
-                  <Text style={styles.sectionTitle}>For You</Text>
+              <View style={styles.sectionRow}>
+                <View style={[styles.sectionStripe, { backgroundColor: palette.coral }]} />
+                <View style={styles.sectionBody}>
+                  <View style={styles.sectionHeader}>
+                    <Text style={styles.sectionTitle}>For You</Text>
+                    <Text style={styles.sectionSubtitle}>
+                      Based on {userInterests.join(' · ')}
+                    </Text>
+                  </View>
+
+                  {forYouTop.length === 0 ? (
+                    <View style={styles.emptyCard}>
+                      <Text style={styles.emptyTitle}>No matches yet</Text>
+                      <Text style={styles.emptyText}>
+                        No events match your interests right now. Browse all events below.
+                      </Text>
+                    </View>
+                  ) : (
+                    <View style={styles.cardStack}>
+                      {forYouTop.map((event, index) => (
+                        <EventCard
+                          key={event.id ?? event.link ?? `for-you-${index}`}
+                          event={event}
+                          onPress={goToEvents}
+                        />
+                      ))}
+
+                      <TouchableOpacity
+                        activeOpacity={0.85}
+                        onPress={goToEvents}
+                        style={styles.viewMoreButton}>
+                        <Text style={styles.viewMoreButtonText}>View more for you</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
                 </View>
-                <Text style={styles.sectionSubtitle}>
-                  Based on {userInterests.join(' · ')}
-                </Text>
               </View>
-
-              {forYouTop.length === 0 ? (
-                <View style={styles.emptyCard}>
-                  <Text style={styles.emptyTitle}>No matches yet</Text>
-                  <Text style={styles.emptyText}>
-                    No events match your interests right now. Browse all events below.
-                  </Text>
-                </View>
-              ) : (
-                <View style={styles.cardStack}>
-                  {forYouTop.map((event, index) => (
-                    <EventCard
-                      key={event.id ?? event.link ?? `for-you-${index}`}
-                      event={event}
-                      onPress={goToEvents}
-                    />
-                  ))}
-
-                  <TouchableOpacity
-                    activeOpacity={0.85}
-                    onPress={goToEvents}
-                    style={styles.viewMoreButton}>
-                    <Text style={styles.viewMoreButtonText}>View more for you</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
             </View>
 
             <View style={styles.section}>
-              <View style={styles.areaContainer}>
-                <View style={styles.sectionHeader}>
-                  <View style={styles.titleRow}>
-                    <View style={[styles.accentBar, styles.accentBarPeach]} />
-                    <Text style={styles.sectionTitle}>Happening in {location.split(',')[0]}</Text>
+              <View style={styles.sectionRow}>
+                <View style={[styles.sectionStripe, { backgroundColor: palette.peach }]} />
+                <View style={styles.sectionBody}>
+                  <View style={styles.areaContainer}>
+                    <View style={styles.sectionHeader}>
+                      <Text style={styles.sectionTitle}>Happening in {location.split(',')[0]}</Text>
+                      <Text style={styles.sectionSubtitle}>All events near you</Text>
+                    </View>
+
+                    <View style={styles.cardStack}>
+                      {happeningTop.map((event, index) => (
+                        <EventCard
+                          key={event.id ?? event.link ?? `area-${index}`}
+                          event={event}
+                          onPress={goToEvents}
+                        />
+                      ))}
+
+                      {hasMoreHappening && (
+                        <TouchableOpacity
+                          activeOpacity={0.85}
+                          onPress={goToEvents}
+                          style={styles.viewAllButton}>
+                          <Text style={styles.viewAllButtonText}>
+                            View all {displayEvents.length} events
+                          </Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
                   </View>
-                  <Text style={styles.sectionSubtitle}>All events near you</Text>
-                </View>
-
-                <View style={styles.cardStack}>
-                  {happeningTop.map((event, index) => (
-                    <EventCard
-                      key={event.id ?? event.link ?? `area-${index}`}
-                      event={event}
-                      onPress={goToEvents}
-                    />
-                  ))}
-
-                  {hasMoreHappening && (
-                    <TouchableOpacity
-                      activeOpacity={0.85}
-                      onPress={goToEvents}
-                      style={styles.viewAllButton}>
-                      <Text style={styles.viewAllButtonText}>
-                        View all {displayEvents.length} events
-                      </Text>
-                    </TouchableOpacity>
-                  )}
                 </View>
               </View>
             </View>
@@ -173,19 +177,16 @@ const styles = StyleSheet.create({
   sectionHeader: {
     marginBottom: 12,
   },
-  titleRow: {
-    alignItems: 'center',
+  sectionRow: {
     flexDirection: 'row',
-    gap: 10,
+    gap: 12,
   },
-  accentBar: {
-    backgroundColor: palette.coral,
-    borderRadius: 2,
-    height: 18,
-    width: 4,
+  sectionStripe: {
+    width: 5,
+    borderRadius: 3,
   },
-  accentBarPeach: {
-    backgroundColor: palette.peach,
+  sectionBody: {
+    flex: 1,
   },
   sectionTitle: {
     color: palette.textPrimary,
@@ -196,7 +197,6 @@ const styles = StyleSheet.create({
     color: palette.textMuted,
     fontSize: 13,
     marginTop: 4,
-    marginLeft: 14,
   },
   cardStack: {
     gap: 12,
@@ -207,7 +207,8 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     minHeight: 48,
     justifyContent: 'center',
-    marginTop: 4,
+    marginTop: 8,
+    ...flatButton('coral'),
   },
   viewMoreButtonText: {
     color: '#FFFFFF',
@@ -217,13 +218,14 @@ const styles = StyleSheet.create({
   },
   viewAllButton: {
     alignItems: 'center',
-    backgroundColor: 'transparent',
+    backgroundColor: palette.card,
     borderColor: palette.peach,
     borderRadius: 14,
     borderWidth: 1.5,
     minHeight: 44,
     justifyContent: 'center',
-    marginTop: 4,
+    marginTop: 8,
+    ...flatButton('peach'),
   },
   viewAllButtonText: {
     color: palette.peach,

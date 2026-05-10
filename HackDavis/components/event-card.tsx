@@ -58,9 +58,7 @@ export const EventCard: React.FC<Props> = ({ event, onPress }) => {
 const styles = StyleSheet.create({
   card: {
     backgroundColor: palette.card,
-    borderColor: palette.border,
     borderRadius: 14,
-    borderWidth: 1,
     elevation: 2,
     flexDirection: 'row',
     overflow: 'hidden',

@@ -16,7 +16,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { auth } from "../../firebase";
-import { palette } from "@/constants/palette";
+import { flatButton, flatOutline, palette } from "@/constants/palette";
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
@@ -139,7 +139,10 @@ export default function AuthScreen() {
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.header}>
-            <Text style={styles.logo}>✦</Text>
+            <View style={styles.brandRow}>
+              <View style={styles.brandStripe} />
+              <Text style={styles.brand}>EventPAL</Text>
+            </View>
             <Text style={styles.title}>
               {mode === "login" ? "Welcome back" : "Create account"}
             </Text>
@@ -355,10 +358,23 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 28,
   },
-  logo: {
-    color: ACCENT,
-    fontSize: 32,
-    marginBottom: 12,
+  brandRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 10,
+    marginBottom: 14,
+  },
+  brandStripe: {
+    backgroundColor: ACCENT,
+    borderRadius: 3,
+    height: 28,
+    width: 5,
+  },
+  brand: {
+    color: palette.textPrimary,
+    fontSize: 28,
+    fontWeight: "800",
+    letterSpacing: -0.5,
   },
   title: {
     color: palette.textPrimary,
@@ -475,6 +491,7 @@ const styles = StyleSheet.create({
     height: 50,
     justifyContent: "center",
     marginTop: 24,
+    ...flatButton('coral'),
   },
   submitBtnDisabled: {
     opacity: 0.7,
@@ -511,6 +528,7 @@ const styles = StyleSheet.create({
     height: 48,
     justifyContent: "center",
     marginBottom: 10,
+    ...flatOutline,
   },
   socialIcon: {
     color: palette.textPrimary,

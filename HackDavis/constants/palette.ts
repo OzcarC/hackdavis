@@ -21,3 +21,20 @@ export const colorForTag = (tag: string): string => {
   }
   return tagPalette[hash % tagPalette.length];
 };
+
+export const paletteDark = {
+  coral: '#A85460',
+  peach: '#B57852',
+  mauve: '#624559',
+  navy: '#15243F',
+};
+
+export const flatButton = (key: keyof typeof paletteDark) => ({
+  borderBottomWidth: 4,
+  borderBottomColor: paletteDark[key],
+});
+
+export const flatOutline = {
+  borderBottomWidth: 3,
+  borderBottomColor: palette.navy,
+};

@@ -18,7 +18,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { auth } from "../../firebase";
 import { API_BASE } from "@/constants/api";
-import { colorForTag, palette } from '@/constants/palette';
+import { colorForTag, flatButton, flatOutline, palette } from '@/constants/palette';
 
 const FALLBACK_LOCATION = "Davis, CA";
 const FALLBACK_COORDS = {
@@ -940,6 +940,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 8,
+    ...flatButton('coral'),
   },
   addButtonText: {
     color: "#fff",
@@ -1004,6 +1005,7 @@ const styles = StyleSheet.create({
     minHeight: 48,
     justifyContent: "center",
     paddingHorizontal: 14,
+    ...flatOutline,
   },
   photoButtonText: {
     color: palette.coral,
@@ -1052,6 +1054,7 @@ const styles = StyleSheet.create({
     flex: 1,
     minHeight: 48,
     justifyContent: "center",
+    ...flatButton('coral'),
   },
   createButtonDisabled: {
     opacity: 0.6,
@@ -1070,6 +1073,7 @@ const styles = StyleSheet.create({
     flex: 1,
     minHeight: 48,
     justifyContent: "center",
+    ...flatOutline,
   },
   cancelButtonText: {
     color: palette.textPrimary,
@@ -1145,6 +1149,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     minHeight: 48,
     justifyContent: "center",
+    ...flatButton('coral'),
   },
   detailLinkButtonText: {
     color: "#fff",
@@ -1159,6 +1164,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     minHeight: 48,
     justifyContent: "center",
+    ...flatOutline,
   },
   detailCloseButtonText: {
     color: palette.textPrimary,
@@ -1328,6 +1334,7 @@ const styles = StyleSheet.create({
     minHeight: 44,
     justifyContent: "center",
     paddingHorizontal: 18,
+    ...flatButton('navy'),
   },
   retryButtonText: {
     color: "#fff",
