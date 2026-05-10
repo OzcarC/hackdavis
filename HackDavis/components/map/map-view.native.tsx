@@ -13,7 +13,7 @@ import { router } from "expo-router";
 import MapView, { Callout, Marker, Region } from "react-native-maps";
 
 import { API_BASE } from "../../constants/api";
-import { colorForTag, flatButton, palette } from "../../constants/palette";
+import { flatButton, palette } from "../../constants/palette";
 
 const TAG_BG = "#EEF2FF";
 const TAG_TEXT = "#4F46E5";
@@ -136,6 +136,11 @@ export default function MapScreen() {
   const [eventsLoading, setEventsLoading] = useState(false);
   const [eventsError, setEventsError] = useState<string | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
+  const nearbyEventLabel = eventsError
+    ? eventsError
+    : eventsLoading
+      ? "Loading nearby events"
+      : `${events.length} event${events.length === 1 ? "" : "s"} near you`;
 
   useEffect(() => {
     (async () => {
@@ -321,19 +326,10 @@ export default function MapScreen() {
           );
         })}
       </MapView>
-      {(eventsLoading || eventsError || events.length > 0) && (
-        <View pointerEvents="none" style={styles.statusBadge}>
-          {eventsLoading && <ActivityIndicator color={palette.card} size="small" />}
-          <Text style={styles.statusBadgeText}>
-            {eventsLoading
-              ? "Loading events"
-              : eventsError ??
-                `${events.length} event${
-                  events.length === 1 ? "" : "s"
-                } nearby`}
-          </Text>
-        </View>
-      )}
+      <View pointerEvents="none" style={styles.statusBadge}>
+        {eventsLoading && <ActivityIndicator color={palette.card} size="small" />}
+        <Text style={styles.statusBadgeText}>{nearbyEventLabel}</Text>
+      </View>
       {Platform.OS === "android" && selectedEvent && (
         <View style={styles.androidPreview}>
           <TouchableOpacity
@@ -529,11 +525,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 7,
     position: "absolute",
-    top: 14,
+    top: 50,
   },
   statusBadgeText: {
     color: palette.card,
-    fontSize: 12,
+    fontSize: 16,
     fontWeight: "600",
   },
   androidPreview: {
