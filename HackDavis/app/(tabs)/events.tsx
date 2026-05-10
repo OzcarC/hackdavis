@@ -25,6 +25,19 @@ const FALLBACK_COORDS = {
   longitude: -121.7405,
 };
 
+const withTimeout = async <T,>(promise: Promise<T>, timeoutMs: number, message: string) => {
+  let timeoutId: ReturnType<typeof setTimeout>;
+  const timeout = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error(message)), timeoutMs);
+  });
+
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    clearTimeout(timeoutId!);
+  }
+};
+
 type Event = {
   id?: string;
   title: string;
@@ -76,6 +89,7 @@ export default function EventsScreen() {
   const [eventCoordinates, setEventCoordinates] = useState(FALLBACK_COORDS);
   const [createOpen, setCreateOpen] = useState(false);
   const [savingEvent, setSavingEvent] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
   const [newTitle, setNewTitle] = useState('');
   const [newWhen, setNewWhen] = useState('');
   const [newAddress, setNewAddress] = useState('');
@@ -97,15 +111,23 @@ export default function EventsScreen() {
           return;
         }
 
-        const currentPosition = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Balanced,
-        });
+        const currentPosition = await withTimeout(
+          Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Balanced,
+          }),
+          8000,
+          'Location lookup timed out.'
+        );
         setEventCoordinates({
           latitude: currentPosition.coords.latitude,
           longitude: currentPosition.coords.longitude,
         });
 
-        const [place] = await Location.reverseGeocodeAsync(currentPosition.coords);
+        const [place] = await withTimeout(
+          Location.reverseGeocodeAsync(currentPosition.coords),
+          8000,
+          'Reverse geocoding timed out.'
+        );
         const city = place?.city ?? place?.subregion ?? place?.district;
         const region = place?.region;
 
@@ -147,7 +169,11 @@ export default function EventsScreen() {
         const eventsUrl = `${API_BASE}/api/events?${params.toString()}`;
         console.log(`Fetching events from ${eventsUrl}`);
 
-        const response = await fetch(eventsUrl);
+        const response = await withTimeout(
+          fetch(eventsUrl),
+          15000,
+          'Events request timed out.'
+        );
 
         if (!response.ok) {
           throw new Error(`Events request failed with status ${response.status}`);
@@ -164,7 +190,14 @@ export default function EventsScreen() {
     };
 
     fetchEvents();
-  }, [eventCoordinates.latitude, eventCoordinates.longitude, eventLocation, filter, locationLoading]);
+  }, [
+    eventCoordinates.latitude,
+    eventCoordinates.longitude,
+    eventLocation,
+    filter,
+    locationLoading,
+    refreshKey,
+  ]);
 
   const resetCreateForm = () => {
     setNewTitle('');
@@ -506,6 +539,12 @@ export default function EventsScreen() {
         <View style={styles.messageBox}>
           <Text style={styles.messageTitle}>Unable to load events</Text>
           <Text style={styles.messageText}>{error}</Text>
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={() => setRefreshKey((key) => key + 1)}
+            style={styles.retryButton}>
+            <Text style={styles.retryButtonText}>Try again</Text>
+          </TouchableOpacity>
         </View>
       ) : (
         <FlatList
@@ -967,5 +1006,20 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginTop: 6,
     textAlign: 'center',
+  },
+  retryButton: {
+    alignItems: 'center',
+    alignSelf: 'center',
+    backgroundColor: '#111827',
+    borderRadius: 12,
+    marginTop: 16,
+    minHeight: 44,
+    justifyContent: 'center',
+    paddingHorizontal: 18,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
   },
 });
